@@ -67,7 +67,7 @@ BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # 构建程序
 echo "正在构建程序..."
 # 编译注入的参数
-LD_FLAGS="-X '${PROJECT_NAME}/pkg/version.appName=${PROJECT_NAME}' -X '${PROJECT_NAME}/pkg/version.gitVersion=${GIT_VERSION}' -X '${PROJECT_NAME}/pkg/version.gitCommit=${GIT_COMMIT}' -X '${PROJECT_NAME}/pkg/version.gitCommitTime=${FORMAT_TIME}' -X '${PROJECT_NAME}/pkg/version.buildTime=${BUILD_TIME}' -X '${PROJECT_NAME}/pkg/version.gitTreeState=${GIT_STATUS}'"
+LD_FLAGS="-X '${PROJECT_NAME}/pkg/version.appName=${PROJECT_NAME}' -X '${PROJECT_NAME}/pkg/version.gitVersion=${GIT_VERSION}' -X '${PROJECT_NAME}/pkg/version.gitCommit=${GIT_COMMIT}' -X '${PROJECT_NAME}/pkg/version.gitCommitTime=${FORMAT_TIME}' -X '${PROJECT_NAME}/pkg/version.buildTime=${BUILD_TIME}' -X '${PROJECT_NAME}/pkg/version.gitTreeState=${GIT_STATUS}' -s -w"
 # 编译程序
 build_status=$(eval "go build -ldflags '"${LD_FLAGS}"' -o ${OUTPUT_FILE} ${ENTRY_FILE}" > /tmp/build.log 2>&1; echo $?)
 if [ $build_status -eq 1 ]; then

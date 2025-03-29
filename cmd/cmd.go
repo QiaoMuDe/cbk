@@ -5,7 +5,12 @@ import (
 	"cbk/pkg/version"
 	"flag"
 	"fmt"
+
+	"gitee.com/MM-Q/colorlib"
 )
+
+// 定义全局颜色渲染器
+var CL = colorlib.NewColorLib()
 
 // 定义子命令及其参数
 var (
@@ -118,7 +123,7 @@ func ExecuteCommands(args []string) error {
 	case "version":
 		versionCmd.Parse(args[1:])
 		v := version.Get()
-		v.PrintVersion("text")
+		CL.Green(v.SprintVersion("text"))
 	// 打印帮助信息
 	case "help":
 		fmt.Println("帮助信息")
