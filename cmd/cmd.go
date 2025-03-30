@@ -894,6 +894,21 @@ func unpackCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("未找到指定任务ID和版本ID的备份记录")
 	}
 
+	// 构建备份文件路径
+	backupFilePath := filepath.Join(record.BackupPath, record.BackupFileName)
+
+	// 检查备份文件是否存在
+	if _, err := tools.CheckPath(backupFilePath); err != nil {
+		return fmt.Errorf("备份文件不存在: %w", err)
+	}
+
+	// 获取备份文件的后8位哈希值
+	if backupFileHash, err := tools.GetFileMD5Last8(backupFilePath); err != nil {
+		return fmt.Errorf("获取备份文件哈希失败: %w", err)
+	} else if backupFileHash != record.VersionHash {
+		return fmt.Errorf("备份文件 %s 的版本 %s 的哈希值与记录不匹配，文件可能已损坏或被篡改。请尝试选择其他版本的备份文件重试", backupFilePath, record.VersionID)
+	}
+
 	// 执行解压操作
 	if outPath, err := tools.UncompressFilesByOS(db, record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
 		return fmt.Errorf("解压备份文件失败: %w", err)
