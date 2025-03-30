@@ -550,10 +550,14 @@ func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (s
 	// 拆分 DecompressArgs 为独立的参数
 	args := strings.Split(decompressConfig.DecompressArgs, "|")
 	// 构建完整的解压命令, 例如1: tar -xvf test.tar.gz -C /home/test，例如2: 7z x -tzip test.zip -o /home/test
-	args = append(args, args[0], zipFilePath, args[1], outputPath)
+	var argsF []string
+	argsF = append(argsF, args[0], zipFilePath, args[1], outputPath)
+	for _, v := range argsF {
+		fmt.Println(v)
+	}
 
 	// 执行命令进行解压
-	cmd := exec.Command(decompressConfig.DecompressTool, args...)
+	cmd := exec.Command(decompressConfig.DecompressTool, argsF...)
 	//cmd.Dir = zipDir // 设置工作目录为目标目录
 	var out strings.Builder
 	cmd.Stdout = &out
