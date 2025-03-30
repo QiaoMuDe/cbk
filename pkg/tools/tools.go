@@ -355,13 +355,14 @@ func SortFilesByModTime(files []FileWithModTime) []FileWithModTime {
 // RetainLatestFiles 处理文件列表，仅保留最新的指定数量的文件
 // 参数：
 //
+//	db - 数据库连接
 //	files - 文件路径列表
 //	retainCount - 保留的文件数量
 //
 // 返回值：
 //
 //	error - 如果发生错误，返回错误信息；否则返回 nil
-func RetainLatestFiles(files []string, retainCount int) error {
+func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 	// 用于存储文件及其最后修改时间
 	var fileInfos []FileWithModTime
 
@@ -392,6 +393,21 @@ func RetainLatestFiles(files []string, retainCount int) error {
 		if err := os.Remove(filePath); err != nil {
 			return fmt.Errorf("清理文件时出错: %w", err)
 		}
+
+		// 按小数点分割文件名，获取文件名称部分
+		parts := strings.Split(filePath, ".")
+
+		// 按下划线分割文件名称部分，获取文件名称和扩展名部分
+		nameParts := strings.Split(parts[0], "_")
+
+		// 构建更新sql
+		updateSql := `update backup_records set data_status =? where task_name =? and timestamp =?;`
+
+		// 执行更新sql
+		if _, err := db.Exec(updateSql, "0", nameParts[0], nameParts[1]); err != nil {
+			return fmt.Errorf("更新备份记录时出错: %w", err)
+		}
+
 		CL.PrintSuccessf("清理历史文件: %s", filePath)
 	}
 

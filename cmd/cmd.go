@@ -528,8 +528,8 @@ func runCmdMain(db *sqlx.DB) error {
 	// 执行备份任务
 	zipPath, err := tools.CompressFilesByOS(db, targetDir, targetName, backupFileNamePath)
 	if err != nil {
-		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
+		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "0", "-"); err != nil {
 			return fmt.Errorf("插入备份记录失败: %w", err)
 		}
 		return fmt.Errorf("备份任务失败: %w", err)
@@ -538,8 +538,8 @@ func runCmdMain(db *sqlx.DB) error {
 	// 获取备份文件的后8位MD5哈希值
 	backupFileMD5, err := tools.GetFileMD5Last8(zipPath)
 	if err != nil {
-		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
+		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "0", "-"); err != nil {
 			return fmt.Errorf("插入备份记录失败: %w", err)
 		}
 		return fmt.Errorf("获取备份文件MD5失败: %w", err)
@@ -548,16 +548,16 @@ func runCmdMain(db *sqlx.DB) error {
 	// 获取备份文件的大小
 	backupFileSize, err := tools.HumanReadableSize(zipPath)
 	if err != nil {
-		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
+		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "0", "-"); err != nil {
 			return fmt.Errorf("插入备份记录失败: %w", err)
 		}
 		return fmt.Errorf("获取备份文件大小失败: %w", err)
 	}
 
 	// 插入备份记录
-	insertSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	if _, err := db.Exec(insertSql, versionID, *runID, backupTime, task.TaskName, "true", filepath.Base(zipPath), backupFileSize, task.BackupDirectory, backupFileMD5); err != nil {
+	insertSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?,?)"
+	if _, err := db.Exec(insertSql, versionID, *runID, backupTime, task.TaskName, "true", filepath.Base(zipPath), backupFileSize, task.BackupDirectory, "1", backupFileMD5); err != nil {
 		return fmt.Errorf("插入备份记录失败: %w", err)
 	}
 
@@ -574,7 +574,7 @@ func runCmdMain(db *sqlx.DB) error {
 
 	// 删除多余的备份文件
 	if len(zipFiles) > task.RetentionCount {
-		if err := tools.RetainLatestFiles(zipFiles, task.RetentionCount); err != nil {
+		if err := tools.RetainLatestFiles(db, zipFiles, task.RetentionCount); err != nil {
 			return fmt.Errorf("删除多余的备份文件失败: %w", err)
 		}
 	}
@@ -618,6 +618,8 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 		ORDER BY timestamp DESC
 		LIMIT ?
 		OFFSET ?
+		where data_status = 1
+	}
 	`
 
 	// 定义结构体来接收查询结果
