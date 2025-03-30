@@ -522,7 +522,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 获取备份文件的后8位MD5哈希值
-	backupFileMD5, err := tools.GetFileMD5Last8(filepath.Join(task.BackupDirectory, zipPath))
+	backupFileMD5, err := tools.GetFileMD5Last8(zipPath)
 	if err != nil {
 		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
@@ -532,7 +532,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 获取备份文件的大小
-	backupFileSize, err := tools.HumanReadableSize(filepath.Join(task.BackupDirectory, zipPath))
+	backupFileSize, err := tools.HumanReadableSize(zipPath)
 	if err != nil {
 		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
