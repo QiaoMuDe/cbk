@@ -883,7 +883,7 @@ func unpackCmdMain(db *sqlx.DB) error {
 	if outPath, err := tools.UncompressFilesByOS(db, record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
 		return fmt.Errorf("解压备份文件失败: %w", err)
 	} else {
-		CL.PrintSuccessf("已解压到: %s", outPath)
+		CL.PrintSuccessf("已解压 %s -> %s", record.BackupFileName, outPath)
 	}
 
 	return nil
