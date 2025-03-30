@@ -489,10 +489,10 @@ func CompressFilesByOS(db *sqlx.DB, targetDir, targetName, backupFileNamePath st
 // UncompressFilesByOS 函数根据操作系统类型执行不同的解压命令
 // 参数：
 //
-//  db - 数据库连接
-//	zipDir - 压缩文件所在目录
-//	zipFileName - 压缩文件名
-//	outputPath - 解压输出路径
+//	 db - 数据库连接
+//		zipDir - 压缩文件所在目录
+//		zipFileName - 压缩文件名
+//		outputPath - 解压输出路径
 //
 // 返回值：
 //
@@ -541,8 +541,8 @@ func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (s
 	// 检查输出路径下是否存在同名
 	baseName := strings.Split(zipFileName, "_")[0] // 按下划线分割文件名，获取文件名称部分
 	outputPath = filepath.Join(outputPath, baseName)
-	if info, err := CheckPath(outputPath); err != nil {
-		return "", fmt.Errorf("检查解压文件路径时出错: %w", err)
+	if info, err := CheckPath(outputPath); os.IsNotExist(err) {
+		// 不存在则忽略
 	} else if info.Exists {
 		return "", fmt.Errorf("解压文件路径已存在: %s", outputPath)
 	}
