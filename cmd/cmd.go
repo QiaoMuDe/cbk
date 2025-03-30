@@ -537,6 +537,7 @@ func editCmdMain(db *sqlx.DB) error {
 	return nil
 }
 
+// runCmdMain 运行备份任务
 func runCmdMain(db *sqlx.DB) error {
 	// 检查任务ID是否指定
 	if *runID == 0 {
@@ -582,6 +583,7 @@ func runCmdMain(db *sqlx.DB) error {
 	backupFileNamePath := filepath.Join(task.BackupDirectory, backupFileNamePrefix) // 获取构建的备份文件路径
 
 	// 执行备份任务
+	CL.PrintSuccess("开始备份任务...")
 	zipPath, err := tools.CompressFilesByOS(db, targetDir, targetName, backupFileNamePath)
 	if err != nil {
 		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -910,6 +912,7 @@ func unpackCmdMain(db *sqlx.DB) error {
 	}
 
 	// 执行解压操作
+	CL.PrintSuccess("开始解压备份文件...")
 	if outPath, err := tools.UncompressFilesByOS(db, record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
 		return fmt.Errorf("解压备份文件失败: %w", err)
 	} else {
