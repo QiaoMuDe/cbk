@@ -540,6 +540,7 @@ func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (s
 
 	// 检查输出路径下是否存在同名
 	baseName := strings.Split(zipFileName, "_")[0] // 按下划线分割文件名，获取文件名称部分
+	CL.PrintDebug(outputPath)
 	outputPath = filepath.Join(outputPath, baseName)
 	CL.PrintDebug(outputPath)
 	if info, err := CheckPath(outputPath); os.IsNotExist(err) {
