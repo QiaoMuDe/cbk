@@ -540,13 +540,11 @@ func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (s
 
 	// 检查输出路径下是否存在同名
 	baseName := strings.Split(zipFileName, "_")[0] // 按下划线分割文件名，获取文件名称部分
-	CL.PrintDebug(outputPath)
-	outputPath = filepath.Join(outputPath, baseName)
-	CL.PrintDebug(outputPath)
-	if info, err := CheckPath(outputPath); os.IsNotExist(err) {
+	tempPath := filepath.Join(outputPath, baseName)
+	if info, err := CheckPath(tempPath); os.IsNotExist(err) {
 		// 不存在则忽略
 	} else if info.Exists {
-		return "", fmt.Errorf("解压文件路径已存在: %s", outputPath)
+		return "", fmt.Errorf("解压文件路径已存在: %s", tempPath)
 	}
 
 	// 拆分 DecompressArgs 为独立的参数
@@ -554,9 +552,6 @@ func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (s
 	// 构建完整的解压命令, 例如1: tar -xvf test.tar.gz -C /home/test，例如2: 7z x -tzip test.zip -o /home/test
 	var argsF []string
 	argsF = append(argsF, args[0], zipFilePath, args[1], outputPath)
-	for _, v := range argsF {
-		fmt.Println(v)
-	}
 
 	// 执行命令进行解压
 	cmd := exec.Command(decompressConfig.DecompressTool, argsF...)
