@@ -1,14 +1,15 @@
 package tools
 
 import (
-	"archive/zip"
 	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -212,82 +213,6 @@ func moveFile(src, dst string) error {
 	return os.Remove(src)
 }
 
-// CreateZip 创建一个 zip 格式的压缩文件
-// 参数：
-//
-//	source - 要压缩的源文件或目录路径
-//	target - 压缩后的目标文件路径
-//
-// 返回值：
-//
-//	如果操作成功，返回 nil；如果出现错误，返回相应的错误信息
-func CreateZip(source, target string) error {
-	// 创建目标 zip 文件
-	zipFile, err := os.Create(target)
-	if err != nil {
-		return fmt.Errorf("创建目标 zip 文件时出错: %w", err)
-	}
-	defer zipFile.Close()
-
-	// 创建一个 zip 写入器，用于将文件写入目标 zip 文件
-	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
-
-	// 遍历源目录及其子目录，对每个文件或目录执行以下操作
-	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("遍历文件时出错: %w", err)
-		}
-
-		// 获取相对于源目录的路径
-		relativePath, err := filepath.Rel(source, path)
-		if err != nil {
-			return fmt.Errorf("获取相对路径时出错: %w", err)
-		}
-
-		// 替换路径分隔符为正斜杠（zip 文件中统一使用正斜杠）
-		relativePath = strings.ReplaceAll(relativePath, string(os.PathSeparator), "/")
-
-		// 创建 zip 文件头，包含文件的元数据
-		header, err := zip.FileInfoHeader(info)
-		if err != nil {
-			return fmt.Errorf("创建 zip 文件头时出错: %w", err)
-		}
-		header.Name = relativePath
-
-		// 如果是目录，在目录名后添加斜杠
-		if info.IsDir() {
-			header.Name += "/"
-			header.Method = zip.Store
-		} else {
-			// 如果是文件，使用 Deflate 压缩方法
-			header.Method = zip.Deflate
-		}
-
-		// 根据文件头创建一个写入器，用于将文件内容写入 zip 文件
-		writer, err := zipWriter.CreateHeader(header)
-		if err != nil {
-			return fmt.Errorf("创建 zip 写入器时出错: %w", err)
-		}
-
-		// 如果不是目录，将文件内容复制到 zip 写入器
-		if !info.IsDir() {
-			file, err := os.Open(path)
-			if err != nil {
-				return fmt.Errorf("打开文件时出错: %w", err)
-			}
-			defer file.Close()
-
-			_, err = io.Copy(writer, file)
-			if err != nil {
-				return fmt.Errorf("复制文件内容到 zip 文件时出错: %w", err)
-			}
-		}
-
-		return nil
-	})
-}
-
 // GetFileMD5Last8 获取文件的 MD5 哈希值的后 8 位
 // 参数：
 //
@@ -460,4 +385,66 @@ func RetainLatestFiles(files []string, retainCount int) error {
 	}
 
 	return nil
+}
+
+// CompressFilesByOS 函数根据操作系统类型执行不同的压缩命令
+// 参数：
+//
+//	targetDir - 目标目录路径
+//	targetName - 要压缩的目标名称
+//	backupFileNamePath - 备份文件的名称
+//
+// 返回值：
+//
+//	string - 压缩文件的路径
+//	error - 如果发生错误，返回错误信息；否则返回 nil
+func CompressFilesByOS(targetDir, targetName, backupFileNamePath string) (string, error) {
+	// 检查操作系统类型
+	if runtime.GOOS == "linux" {
+		// 构建完整的压缩文件路径
+		backupFilePath := filepath.Join(targetDir, fmt.Sprintf("%s.tgz", backupFileNamePath))
+
+		// 检查tar命令是否可用
+		if _, err := exec.LookPath("tar"); err != nil {
+			return "", fmt.Errorf("tar 命令不可用: %w", err)
+		}
+
+		// 执行 tar 命令进行压缩
+		cmd := exec.Command("tar", "-czf", backupFilePath, targetName)
+		cmd.Dir = targetDir // 设置工作目录为目标目录
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			return "", fmt.Errorf("压缩文件时出错: %w", err)
+		}
+
+		return backupFilePath, nil
+	}
+
+	if runtime.GOOS == "windows" {
+		// 构建完整的压缩文件路径
+		backupFilePath := filepath.Join(targetDir, fmt.Sprintf("%s.zip", backupFileNamePath))
+
+		// 检查7z命令是否可用
+		if _, err := exec.LookPath("7z"); err != nil {
+			return "", fmt.Errorf("7z 命令不可用: %w", err)
+		}
+
+		// 执行 7z 命令进行压缩
+		cmd := exec.Command("7z", "a", "-tzip", backupFilePath, targetName)
+		cmd.Dir = targetDir // 设置工作目录为目标目录
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			return "", fmt.Errorf("压缩文件时出错: %w", err)
+		}
+
+		return backupFilePath, nil
+	}
+
+	// 如果操作系统类型不支持，返回错误
+	return "", fmt.Errorf("不支持的操作系统类型")
+
 }

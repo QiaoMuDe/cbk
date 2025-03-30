@@ -501,13 +501,19 @@ func runCmdMain(db *sqlx.DB) error {
 
 	// 构建备份文件名
 	backupTime := time.Now().Format("20060102150405")
-	backupFileName := fmt.Sprintf("%s_%s.zip", task.TaskName, backupTime)
+	backupFileNamePrefix := fmt.Sprintf("%s_%s", task.TaskName, backupTime)
 
 	// 获取versionID
 	versionID := tools.GenerateID(6)
 
 	// 运行备份任务
-	if err := tools.CreateZip(task.TargetDirectory, filepath.Join(task.BackupDirectory, backupFileName)); err != nil {
+	targetDir := filepath.Dir(task.TargetDirectory)                                 // 获取目标目录的目录部分
+	targetName := filepath.Base(task.TargetDirectory)                               // 获取目标目录的最后一个部分
+	backupFileNamePath := filepath.Join(task.BackupDirectory, backupFileNamePrefix) // 获取构建的备份文件路径
+
+	// 执行备份任务
+	zipPath, err := tools.CompressFilesByOS(targetDir, targetName, backupFileNamePath)
+	if err != nil {
 		errorSql := "insert into backup_records (version_id, task_id, tinestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
 			return fmt.Errorf("插入备份记录失败: %w", err)
@@ -516,7 +522,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 获取备份文件的后8位MD5哈希值
-	backupFileMD5, err := tools.GetFileMD5Last8(filepath.Join(task.BackupDirectory, backupFileName))
+	backupFileMD5, err := tools.GetFileMD5Last8(filepath.Join(task.BackupDirectory, zipPath))
 	if err != nil {
 		errorSql := "insert into backup_records (version_id, task_id, tinestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
@@ -526,7 +532,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 获取备份文件的大小
-	backupFileSize, err := tools.HumanReadableSize(filepath.Join(task.BackupDirectory, backupFileName))
+	backupFileSize, err := tools.HumanReadableSize(filepath.Join(task.BackupDirectory, zipPath))
 	if err != nil {
 		errorSql := "insert into backup_records (version_id, task_id, tinestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
@@ -537,7 +543,7 @@ func runCmdMain(db *sqlx.DB) error {
 
 	// 插入备份记录
 	insertSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	if _, err := db.Exec(insertSql, versionID, *runID, backupTime, task.TaskName, "true", backupFileName, backupFileSize, task.BackupDirectory, backupFileMD5); err != nil {
+	if _, err := db.Exec(insertSql, versionID, *runID, backupTime, task.TaskName, "true", zipPath, backupFileSize, task.BackupDirectory, backupFileMD5); err != nil {
 		return fmt.Errorf("插入备份记录失败: %w", err)
 	}
 
@@ -556,7 +562,7 @@ func runCmdMain(db *sqlx.DB) error {
 
 	// 打印备份信息
 	CL.PrintSuccessf("备份任务 %s 完成", task.TaskName)
-	CL.PrintSuccessf("备份文件: %s", filepath.Join(task.BackupDirectory, backupFileName))
+	CL.PrintSuccessf("备份文件: %s", filepath.Join(task.BackupDirectory, zipPath))
 	CL.PrintSuccessf("备份文件大小: %s", backupFileSize)
 	CL.PrintSuccessf("备份文件MD5: %s", backupFileMD5)
 	CL.PrintSuccessf("备份文件版本ID: %s", versionID)
