@@ -196,22 +196,14 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 
 // add命令的执行逻辑
 func addCmdMain(db *sqlx.DB) error {
-	// 检查参数是否为空
+	// 检查任务名是否为空
 	if *addName == "" {
 		return fmt.Errorf("任务名不能为空")
 	}
 
+	// 检查目标目录是否为空
 	if *addTarget == "" {
 		return fmt.Errorf("目标目录不能为空")
-	}
-
-	// 如果备份目录为空, 则使用默认值
-	if *addBackup == "" {
-		tempHome, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("获取用户主目录失败: %w", err)
-		}
-		*addBackup = filepath.Join(tempHome, ".cbk", "data", *addName)
 	}
 
 	// 检查目标目录或文件是否存在
@@ -229,10 +221,43 @@ func addCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("任务名已存在, 请在更换任务名或删除已有任务后再添加")
 	}
 
-	// 检查备份目录是否存在
-	if _, err := tools.CheckPath(*addBackup); err != nil {
-		if err := os.MkdirAll(*addBackup, 0755); err != nil {
-			return fmt.Errorf("备份目录创建失败: %w", err)
+	// 如果备份目录为空, 则使用默认值
+	if *addBackup == "" {
+		tempHome, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("获取用户主目录失败: %w", err)
+		}
+		*addBackup = filepath.Join(tempHome, ".cbk", "data", *addName)
+
+		// 检查备份目录是否存在
+		if _, err := tools.CheckPath(*addBackup); err != nil {
+			if err := os.MkdirAll(*addBackup, 0755); err != nil {
+				return fmt.Errorf("备份目录创建失败: %w", err)
+			}
+		}
+	} else {
+		// 检查备份目录是否存在
+		if _, err := tools.CheckPath(*addBackup); err != nil {
+			return fmt.Errorf("备份目录不存在: %w", err)
+		}
+
+		// 检查备份目录是否为绝对路径
+		if !filepath.IsAbs(*addBackup) {
+			var err error
+			*addBackup, err = filepath.Abs(*addBackup)
+			if err != nil {
+				return fmt.Errorf("获取备份目录绝对路径失败: %w", err)
+			}
+		}
+
+		// 构建备份目录的绝对路径
+		*addBackup = filepath.Join(*addBackup, *addName)
+
+		// 检查备份目录是否存在
+		if _, err := tools.CheckPath(*addBackup); err != nil {
+			if err := os.MkdirAll(*addBackup, 0755); err != nil {
+				return fmt.Errorf("备份目录创建失败: %w", err)
+			}
 		}
 	}
 
