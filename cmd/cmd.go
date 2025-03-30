@@ -4,6 +4,7 @@ package cmd
 import (
 	"cbk/pkg/tools"
 	"cbk/pkg/version"
+	"database/sql"
 	_ "embed"
 	"flag"
 	"fmt"
@@ -305,20 +306,12 @@ func addCmdMain(db *sqlx.DB) error {
 func deleteCmdMain(db *sqlx.DB) error {
 	// 如果deleteName不为空, 则根据任务名删除任务
 	if *deleteName != "" {
-		// 检查任务是否存在
-		checkSql := "select count(*) from backup_tasks where task_name =?"
-		var count int
-		if err := db.Get(&count, checkSql, *deleteName); err != nil {
-			return fmt.Errorf("检查任务失败: %w", err)
-		}
-		if count == 0 {
-			return fmt.Errorf("任务名不存在 %s", *deleteName)
-		}
-
 		// 获取备份存放目录
 		var backupDir string
 		backupDirSql := "select backup_directory from backup_tasks where task_name = ?"
-		if err := db.Get(&backupDir, backupDirSql, *deleteName); err != nil {
+		if err := db.Get(&backupDir, backupDirSql, *deleteName); err == sql.ErrNoRows {
+			return fmt.Errorf("任务名不存在 %s", *deleteName)
+		} else if err != nil {
 			return fmt.Errorf("获取备份存放目录失败: %w", err)
 		}
 
@@ -346,20 +339,12 @@ func deleteCmdMain(db *sqlx.DB) error {
 
 	// 如果deleteID不为0, 则根据任务ID删除任务
 	if *deleteID != 0 {
-		// 检查任务ID是否存在
-		checkSql := "select count(*) from backup_tasks where task_id =?"
-		var count int
-		if err := db.Get(&count, checkSql, *deleteID); err != nil {
-			return fmt.Errorf("检查任务失败: %w", err)
-		}
-		if count == 0 {
-			return fmt.Errorf("任务ID不存在 %d", *deleteID)
-		}
-
 		// 获取备份存放目录
 		var backupDir string
 		backupDirSql := "select backup_directory from backup_tasks where task_id = ?"
-		if err := db.Get(&backupDir, backupDirSql, *deleteID); err != nil {
+		if err := db.Get(&backupDir, backupDirSql, *deleteID); err == sql.ErrNoRows {
+			return fmt.Errorf("任务ID不存在 %d", *deleteID)
+		} else if err != nil {
 			return fmt.Errorf("获取备份存放目录失败: %w", err)
 		}
 
@@ -459,24 +444,16 @@ func editCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("编辑任务时, 必须指定任务ID")
 	}
 
-	// 检查任务是否存在
-	checkSql := "select count(*) from backup_tasks where task_id =?"
-	var count int
-	if err := db.Get(&count, checkSql, *editID); err != nil {
-		return fmt.Errorf("检查任务失败: %w", err)
-	}
-	if count == 0 {
-		return fmt.Errorf("任务ID不存在 %d", *editID)
-	}
-
 	// 编辑任务
 	editSql := "select task_name, retention_count from backup_tasks where task_id =?"
 	var task struct {
 		TaskName       string `db:"task_name"`       // 任务名
 		RetentionCount int    `db:"retention_count"` // 保留数量
 	}
-	if err := db.Get(&task, editSql, *editID); err != nil {
-		return fmt.Errorf("编辑任务失败: %w", err)
+	if err := db.Get(&task, editSql, *editID); err == sql.ErrNoRows {
+		return fmt.Errorf("任务ID不存在 %d", *editID)
+	} else if err != nil {
+		return fmt.Errorf("查询任务失败: %w", err)
 	}
 
 	// 如果指定了-n参数, 则更新任务名
@@ -544,16 +521,6 @@ func runCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("运行备份任务时, 必须指定任务ID")
 	}
 
-	// 检查任务是否存在
-	checkSql := "select count(*) from backup_tasks where task_id =?"
-	var count int
-	if err := db.Get(&count, checkSql, *runID); err != nil {
-		return fmt.Errorf("检查任务失败: %w", err)
-	}
-	if count == 0 {
-		return fmt.Errorf("任务ID不存在 %d", *runID)
-	}
-
 	// 获取任务信息
 	var task struct {
 		TaskName        string `db:"task_name"`        // 任务名
@@ -562,8 +529,10 @@ func runCmdMain(db *sqlx.DB) error {
 		RetentionCount  int    `db:"retention_count"`  // 保留数量
 	}
 	querySql := "select task_name, target_directory, backup_directory, retention_count from backup_tasks where task_id =?"
-	if err := db.Get(&task, querySql, *runID); err != nil {
-		return fmt.Errorf("查询任务失败: %w", err)
+	if err := db.Get(&task, querySql, *runID); err == sql.ErrNoRows {
+		return fmt.Errorf("任务ID不存在 %d", *runID)
+	} else if err != nil {
+		return fmt.Errorf("获取任务信息失败: %w", err)
 	}
 
 	// 检查目标目录或文件是否存在
@@ -630,7 +599,7 @@ func runCmdMain(db *sqlx.DB) error {
 	fileExtensionSql := "select file_extension from compress_config where os_type = ?"
 	var fileExtension string
 	if err := db.Get(&fileExtension, fileExtensionSql, runtime.GOOS); err != nil {
-		return fmt.Errorf("获取压缩文件扩展名失败: %w", err)
+		return fmt.Errorf("获取文件扩展名失败: %w", err)
 	}
 	zipFiles, err := tools.GetZipFiles(task.BackupDirectory, fileExtension)
 	if err != nil {
@@ -699,7 +668,9 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 	}
 
 	// 执行查询
-	if err := db.Select(&records, querySql, pageSize, offset); err != nil {
+	if err := db.Select(&records, querySql, pageSize, offset); err == sql.ErrNoRows {
+		return fmt.Errorf("没有查询到任何记录")
+	} else if err != nil {
 		return fmt.Errorf("查询备份记录失败: %w", err)
 	}
 
@@ -786,7 +757,9 @@ func showCmdMain(db *sqlx.DB) error {
 	}
 
 	// 执行查询
-	if err := db.Select(&records, querySql, *showID); err != nil {
+	if err := db.Select(&records, querySql, *showID); err == sql.ErrNoRows {
+		return fmt.Errorf("未找到指定任务ID %d 的备份记录", *showID)
+	} else if err != nil {
 		return fmt.Errorf("查询备份记录失败: %w", err)
 	}
 
@@ -858,6 +831,26 @@ func unpackCmdMain(db *sqlx.DB) error {
 	// 检查versionID是否指定
 	if *unpackVersionID == "" {
 		return fmt.Errorf("解压指定备份任务时, 必须指定版本ID")
+	}
+
+	// 检查*unpackID是否是已存在的
+	var taskCount int
+	if err := db.Get(&taskCount, "SELECT COUNT(*) FROM backup_records WHERE task_id = ? AND data_status = '1';", *unpackID); err == sql.ErrNoRows {
+		return fmt.Errorf("未找到指定任务ID %d 的备份记录", *unpackID)
+	} else if err != nil {
+		return fmt.Errorf("查询备份记录失败: %w", err)
+	} else if taskCount == 0 {
+		return fmt.Errorf("未找到指定任务ID %d 的备份记录", *unpackID)
+	}
+
+	// 检查versionID是否是已存在的
+	var versionCount int
+	if err := db.Get(&versionCount, "SELECT COUNT(*) FROM backup_records WHERE version_id = ? AND data_status = '1';", *unpackVersionID); err == sql.ErrNoRows {
+		return fmt.Errorf("未找到指定版本ID %s 的备份记录", *unpackVersionID)
+	} else if err != nil {
+		return fmt.Errorf("查询备份记录失败: %w", err)
+	} else if versionCount == 0 {
+		return fmt.Errorf("未找到指定版本ID %s 的备份记录", *unpackVersionID)
 	}
 
 	// 构建查询sql语句
