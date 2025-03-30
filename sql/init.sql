@@ -13,6 +13,12 @@ CREATE TABLE IF NOT EXISTS backup_records (
     FOREIGN KEY (task_id) REFERENCES backup_tasks (task_id) ON DELETE CASCADE -- 定义外键关系，删除备份任务时自动删除相关备份记录
 );
 
+-- 给备份记录表添加索引，用于提高查询效率 
+CREATE INDEX IF NOT EXISTS idx_backup_records_timestamp ON backup_records (timestamp);
+
+-- 给备份记录表添加索引，用于提高查询效率
+CREATE INDEX IF NOT EXISTS idx_backup_records_task_id ON backup_records (task_id);
+
 -- 创建备份任务表，用于定义备份任务的基本信息
 CREATE TABLE IF NOT EXISTS backup_tasks (
     task_id INTEGER PRIMARY KEY AUTOINCREMENT, -- 唯一标识备份任务的 ID （自动递增）

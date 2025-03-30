@@ -615,11 +615,9 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 	querySql := `
 		SELECT version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash
 		FROM backup_records
-		ORDER BY timestamp DESC
-		LIMIT ?
-		OFFSET ?
 		where data_status = 1
-	}
+		ORDER BY timestamp DESC
+		LIMIT ? OFFSET ?;
 	`
 
 	// 定义结构体来接收查询结果
