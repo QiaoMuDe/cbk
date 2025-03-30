@@ -402,7 +402,7 @@ func CompressFilesByOS(targetDir, targetName, backupFileNamePath string) (string
 	// 检查操作系统类型
 	if runtime.GOOS == "linux" {
 		// 构建完整的压缩文件路径
-		backupFilePath := filepath.Join(targetDir, fmt.Sprintf("%s.tgz", backupFileNamePath))
+		backupFilePath := fmt.Sprintf("%s.tgz", backupFileNamePath)
 
 		// 检查tar命令是否可用
 		if _, err := exec.LookPath("tar"); err != nil {
@@ -424,7 +424,7 @@ func CompressFilesByOS(targetDir, targetName, backupFileNamePath string) (string
 
 	if runtime.GOOS == "windows" {
 		// 构建完整的压缩文件路径
-		backupFilePath := filepath.Join(targetDir, fmt.Sprintf("%s.zip", backupFileNamePath))
+		backupFilePath := fmt.Sprintf("%s.zip", backupFileNamePath)
 
 		// 检查7z命令是否可用
 		if _, err := exec.LookPath("7z"); err != nil {
