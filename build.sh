@@ -31,6 +31,16 @@ if [ -z "$OUTPUT_FILE" ]; then
     exit 1
 fi
 
+# 通过 go mod tidy 检查依赖
+echo "正在检查依赖..."
+go mod tidy > /tmp/tidy.log 2>&1
+if [ $? -ne 0 ]; then
+    echo "错误: 依赖检查失败，请修复依赖问题。"
+    cat /tmp/tidy.log
+    exit 1
+fi
+rm -f /tmp/tidy.log
+
 # 通过 go vet 检查代码
 echo "正在检查代码..."
 go vet ${ENTRY_FILE} > /tmp/vet.log 2>&1
@@ -68,6 +78,7 @@ BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "正在构建程序..."
 # 编译注入的参数
 LD_FLAGS="-X '${PROJECT_NAME}/pkg/version.appName=${PROJECT_NAME}' -X '${PROJECT_NAME}/pkg/version.gitVersion=${GIT_VERSION}' -X '${PROJECT_NAME}/pkg/version.gitCommit=${GIT_COMMIT}' -X '${PROJECT_NAME}/pkg/version.gitCommitTime=${FORMAT_TIME}' -X '${PROJECT_NAME}/pkg/version.buildTime=${BUILD_TIME}' -X '${PROJECT_NAME}/pkg/version.gitTreeState=${GIT_STATUS}' -s -w"
+
 # 编译程序
 build_status=$(eval "go build -ldflags '"${LD_FLAGS}"' -o ${OUTPUT_FILE} ${ENTRY_FILE}" > /tmp/build.log 2>&1; echo $?)
 if [ $build_status -eq 1 ]; then
@@ -85,6 +96,7 @@ echo "Git 提交: $GIT_COMMIT"
 echo "Git 提交时间: $FORMAT_TIME"
 echo "构建时间: $BUILD_TIME"
 echo "----------------------------------------------------------"
+
 # 清理临时文件
 rm -f /tmp/build.log
 #########################################################################

@@ -29,6 +29,16 @@ if not exist "%ENTRY_FILE%" (
     exit /b 1
 )
 
+REM :: 通过 go mod tidy 确保依赖项的一致性
+go mod tidy > mod_tidy.log 2>&1
+if %errorlevel% neq 0 (
+    echo 错误: go mod tidy 执行失败，请检查错误信息。
+    type mod_tidy.log
+    del mod_tidy.log 
+)
+del mod_tidy.log
+
+REM :: 通过 go vet 检查代码
 go vet %ENTRY_FILE% > vet.log 2>&1
 if %errorlevel% neq 0 (
     echo 错误: go vet 检查失败，请查看以下问题：

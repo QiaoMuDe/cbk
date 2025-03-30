@@ -1,10 +1,15 @@
 package tools
 
 import (
+	"archive/zip"
+	"crypto/md5"
+	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,6 +34,12 @@ type PathInfo struct {
 	Size    int64       // 文件大小（字节）
 	Mode    os.FileMode // 文件权限
 	ModTime time.Time   // 文件修改时间
+}
+
+// FileWithModTime 表示文件及其最后修改时间
+type FileWithModTime struct {
+	Path    string
+	ModTime time.Time
 }
 
 // GenerateID 生成包含时间戳和指定长度随机字符的ID
@@ -94,4 +105,359 @@ func CheckPath(path string) (PathInfo, error) {
 
 	// 返回路径信息结构体
 	return info, nil
+}
+
+// MergeStringFlags 函数用于合并长选项和短选项，返回一个字符串和一个错误。
+// 如果同时指定了长选项和短选项，则返回一个错误。
+// 如果只指定了一个选项，则返回该选项的值。
+// 如果两个选项都未指定，则返回空字符串。
+func MergeStringFlags(longPtr, shortPtr string) (string, error) {
+	// 检查长选项和短选项是否同时不为空
+	if longPtr != "" && shortPtr != "" {
+		// 如果同时指定了长选项和短选项，则返回一个错误
+		return "", errors.New("不能同时指定长选项和短选项")
+	}
+
+	// 如果长选项不为空, 则返回长选项
+	if longPtr != "" {
+		return longPtr, nil
+	}
+
+	// 如果短选项不为空, 则返回短选项
+	if shortPtr != "" {
+		return shortPtr, nil
+	}
+
+	// 如果长选项和短选项都为空, 则返回空字符串
+	return "", nil
+}
+
+// MoveDir 将一个目录移动到另一个位置
+// 参数：
+//
+//	src - 源目录路径
+//	dst - 目标目录路径
+//
+// 返回：
+//
+//	error - 如果发生错误，返回错误信息；否则返回nil
+func MoveDir(src, dst string) error {
+	// 检查源目录是否存在
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		return fmt.Errorf("源目录 %s 不存在", src)
+	}
+
+	// 遍历源目录
+	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// 计算目标路径
+		relativePath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		dstPath := filepath.Join(dst, relativePath)
+
+		// 如果是目录，创建对应的目录
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, info.Mode())
+		}
+
+		// 如果是文件，移动文件
+		return moveFile(path, dstPath)
+	})
+	if err != nil {
+		return err
+	}
+
+	// 删除源目录
+	return os.RemoveAll(src)
+}
+
+// moveFile 移动单个文件
+func moveFile(src, dst string) error {
+	// 打开源文件
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	// 创建目标文件
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	// 拷贝内容
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return err
+	}
+
+	// 获取源文件的 FileInfo
+	srcFileInfo, err := srcFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	// 设置目标文件的权限
+	if err := os.Chmod(dst, srcFileInfo.Mode()); err != nil {
+		return err
+	}
+
+	// 删除源文件
+	return os.Remove(src)
+}
+
+// CreateZip 创建一个 zip 格式的压缩文件
+// 参数：
+//
+//	source - 要压缩的源文件或目录路径
+//	target - 压缩后的目标文件路径
+//
+// 返回值：
+//
+//	如果操作成功，返回 nil；如果出现错误，返回相应的错误信息
+func CreateZip(source, target string) error {
+	// 创建目标 zip 文件
+	zipFile, err := os.Create(target)
+	if err != nil {
+		return fmt.Errorf("创建目标 zip 文件时出错: %w", err)
+	}
+	defer zipFile.Close()
+
+	// 创建一个 zip 写入器，用于将文件写入目标 zip 文件
+	zipWriter := zip.NewWriter(zipFile)
+	defer zipWriter.Close()
+
+	// 遍历源目录及其子目录，对每个文件或目录执行以下操作
+	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("遍历文件时出错: %w", err)
+		}
+
+		// 获取相对于源目录的路径
+		relativePath, err := filepath.Rel(source, path)
+		if err != nil {
+			return fmt.Errorf("获取相对路径时出错: %w", err)
+		}
+
+		// 替换路径分隔符为正斜杠（zip 文件中统一使用正斜杠）
+		relativePath = strings.ReplaceAll(relativePath, string(os.PathSeparator), "/")
+
+		// 创建 zip 文件头，包含文件的元数据
+		header, err := zip.FileInfoHeader(info)
+		if err != nil {
+			return fmt.Errorf("创建 zip 文件头时出错: %w", err)
+		}
+		header.Name = relativePath
+
+		// 如果是目录，在目录名后添加斜杠
+		if info.IsDir() {
+			header.Name += "/"
+			header.Method = zip.Store
+		} else {
+			// 如果是文件，使用 Deflate 压缩方法
+			header.Method = zip.Deflate
+		}
+
+		// 根据文件头创建一个写入器，用于将文件内容写入 zip 文件
+		writer, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			return fmt.Errorf("创建 zip 写入器时出错: %w", err)
+		}
+
+		// 如果不是目录，将文件内容复制到 zip 写入器
+		if !info.IsDir() {
+			file, err := os.Open(path)
+			if err != nil {
+				return fmt.Errorf("打开文件时出错: %w", err)
+			}
+			defer file.Close()
+
+			_, err = io.Copy(writer, file)
+			if err != nil {
+				return fmt.Errorf("复制文件内容到 zip 文件时出错: %w", err)
+			}
+		}
+
+		return nil
+	})
+}
+
+// GetFileMD5Last8 获取文件的 MD5 哈希值的后 8 位
+// 参数：
+//
+//	filePath - 文件路径
+//
+// 返回值：
+//
+//	string - 文件 MD5 哈希值的后 8 位
+//	error - 如果发生错误，返回错误信息；否则返回 nil
+func GetFileMD5Last8(filePath string) (string, error) {
+	// 打开文件
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("打开文件时出错: %w", err)
+	}
+	defer file.Close()
+
+	// 创建 MD5 哈希对象
+	hash := md5.New()
+
+	// 分块读取文件内容
+	buffer := make([]byte, 32*1024) // 32KB 缓冲区
+	for {
+		n, err := file.Read(buffer)
+		if err != nil && err != io.EOF {
+			return "", fmt.Errorf("读取文件内容时出错: %w", err)
+		}
+		if n == 0 {
+			break // 文件读取完成
+		}
+		hash.Write(buffer[:n]) // 将读取的内容写入哈希对象
+	}
+
+	// 获取完整的 MD5 哈希值
+	sum := hash.Sum(nil)
+
+	// 将哈希值转换为十六进制字符串
+	hashStr := fmt.Sprintf("%x", sum)
+
+	// 返回哈希值的后 8 位
+	return hashStr[len(hashStr)-8:], nil
+}
+
+// HumanReadableSize 获取文件大小并转换为人性化单位显示
+// 参数：
+//
+//	filePath - 文件路径
+//
+// 返回值：
+//
+//	string - 文件大小的人性化表示
+//	error - 如果发生错误，返回错误信息；否则返回 nil
+func HumanReadableSize(filePath string) (string, error) {
+	// 打开文件
+	file, err := os.Stat(filePath)
+	if err != nil {
+		return "", fmt.Errorf("获取文件信息时出错: %w", err)
+	}
+
+	// 获取文件大小（以字节为单位）
+	size := file.Size()
+
+	// 定义单位和换算关系
+	units := []string{"B", "KB", "MB", "GB"}
+	base := float64(1024)
+
+	// 转换为合适的单位
+	var unit string
+	sizeFloat := float64(size) // 将 size 转换为 float64
+	if sizeFloat < base {
+		unit = units[0]
+	} else if sizeFloat < base*base {
+		unit = units[1]
+		sizeFloat /= base
+	} else if sizeFloat < base*base*base {
+		unit = units[2]
+		sizeFloat /= base * base
+	} else {
+		unit = units[3]
+		sizeFloat /= base * base * base
+	}
+
+	// 格式化输出
+	return fmt.Sprintf("%.2f%s", sizeFloat, unit), nil
+}
+
+// GetZipFiles 获取指定目录下所有以 .zip 结尾的文件列表
+// 参数：
+//
+//	dirPath - 目录路径
+//
+// 返回值：
+//
+//	[]string - 匹配的文件路径列表
+//	error - 如果发生错误，返回错误信息；否则返回 nil
+func GetZipFiles(dirPath string) ([]string, error) {
+	// 用于存储匹配的文件路径
+	var zipFiles []string
+
+	// 遍历目录及其子目录
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("遍历文件时出错: %w", err)
+		}
+
+		// 检查文件是否以 .zip 结尾
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".zip") {
+			zipFiles = append(zipFiles, path)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("遍历目录时出错: %w", err)
+	}
+
+	return zipFiles, nil
+}
+
+// SortFilesByModTime 按照文件的最后修改时间对文件列表进行排序
+func SortFilesByModTime(files []FileWithModTime) []FileWithModTime {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].ModTime.Before(files[j].ModTime)
+	})
+	return files
+}
+
+// RetainLatestFiles 处理文件列表，仅保留最新的指定数量的文件
+// 参数：
+//
+//	files - 文件路径列表
+//	retainCount - 保留的文件数量
+//
+// 返回值：
+//
+//	error - 如果发生错误，返回错误信息；否则返回 nil
+func RetainLatestFiles(files []string, retainCount int) error {
+	// 用于存储文件及其最后修改时间
+	var fileInfos []FileWithModTime
+
+	// 获取每个文件的最后修改时间
+	for _, filePath := range files {
+		info, err := os.Stat(filePath)
+		if os.IsNotExist(err) {
+			CL.PrintErrorf("文件不存在，跳过: %s", filePath)
+			continue
+		} else if err != nil {
+			return fmt.Errorf("获取文件信息时出错: %w", err)
+		}
+		fileInfos = append(fileInfos, FileWithModTime{Path: filePath, ModTime: info.ModTime()})
+	}
+
+	// 按照文件的最后修改时间排序
+	fileInfos = SortFilesByModTime(fileInfos)
+
+	// 如果文件数量小于或等于保留数量，直接返回
+	if len(fileInfos) <= retainCount {
+		CL.PrintSuccessf("文件数量小于或等于保留数量，无需清理")
+		return nil
+	}
+
+	// 删除最早的文件，仅保留最新的指定数量的文件
+	for i := 0; i < len(fileInfos)-retainCount; i++ {
+		filePath := fileInfos[i].Path
+		if err := os.Remove(filePath); err != nil {
+			return fmt.Errorf("清理文件时出错: %w", err)
+		}
+		CL.PrintSuccessf("清理历史文件: %s", filePath)
+	}
+
+	return nil
 }

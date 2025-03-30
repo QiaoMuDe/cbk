@@ -29,7 +29,7 @@ const (
 
 func main() {
 	// 初始化数据库
-	_, err := initDB()
+	db, err := initDB()
 	if err != nil {
 		CL.PrintErrorf("初始化数据库失败: %v", err)
 		os.Exit(1)
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	// 执行子命令
-	err = cmd.ExecuteCommands(args)
+	err = cmd.ExecuteCommands(db, args)
 	if err != nil {
 		CL.PrintError(err)
 		os.Exit(1)
