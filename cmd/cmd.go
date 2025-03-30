@@ -6,8 +6,10 @@ import (
 	"cbk/pkg/version"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"gitee.com/MM-Q/colorlib"
@@ -46,8 +48,9 @@ var (
 	editID   = editCmd.Int("id", 0, "任务ID")
 	editKeep = editCmd.Int("k", 3, "保留数量")
 
-	// // 子命令：log
-	// logCmd = flag.NewFlagSet("log", flag.ExitOnError)
+	// 子命令：log
+	logCmd   = flag.NewFlagSet("log", flag.ExitOnError)
+	logLimit = logCmd.Int("l", 10, "显示的行数")
 
 	// // 子命令：show
 	// showCmd = flag.NewFlagSet("show", flag.ExitOnError)
@@ -155,8 +158,13 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		}
 		return nil
 	case "log":
-		fmt.Printf("查看备份日志: %s\n", args[1])
-		fmt.Println(args[1:])
+		// 解析log命令的参数
+		logCmd.Parse(args[1:])
+		// 执行log命令的逻辑
+		if err := logCmdMain(db, 1, *logLimit); err != nil {
+			return fmt.Errorf("查看日志失败: %v", err)
+		}
+		return nil
 	case "show":
 		fmt.Printf("查看指定备份任务的信息: %s\n", args[1])
 		fmt.Println(args[1:])
@@ -228,9 +236,15 @@ func addCmdMain(db *sqlx.DB) error {
 		}
 	}
 
+	// 扩展目标目录为绝对路径
+	AbsAddTarget, err := filepath.Abs(*addTarget)
+	if err != nil {
+		return fmt.Errorf("获取目标目录绝对路径失败: %w", err)
+	}
+
 	// 插入新任务到数据库
 	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count) values(?, ?, ?, ?)"
-	if _, err := db.Exec(insertSql, *addName, *addTarget, *addBackup, *addKeep); err != nil {
+	if _, err := db.Exec(insertSql, *addName, AbsAddTarget, *addBackup, *addKeep); err != nil {
 		return fmt.Errorf("插入任务失败: %w", err)
 	}
 
@@ -512,7 +526,7 @@ func runCmdMain(db *sqlx.DB) error {
 	backupFileNamePath := filepath.Join(task.BackupDirectory, backupFileNamePrefix) // 获取构建的备份文件路径
 
 	// 执行备份任务
-	zipPath, err := tools.CompressFilesByOS(targetDir, targetName, backupFileNamePath)
+	zipPath, err := tools.CompressFilesByOS(db, targetDir, targetName, backupFileNamePath)
 	if err != nil {
 		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
@@ -543,12 +557,17 @@ func runCmdMain(db *sqlx.DB) error {
 
 	// 插入备份记录
 	insertSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	if _, err := db.Exec(insertSql, versionID, *runID, backupTime, task.TaskName, "true", zipPath, backupFileSize, task.BackupDirectory, backupFileMD5); err != nil {
+	if _, err := db.Exec(insertSql, versionID, *runID, backupTime, task.TaskName, "true", filepath.Base(zipPath), backupFileSize, task.BackupDirectory, backupFileMD5); err != nil {
 		return fmt.Errorf("插入备份记录失败: %w", err)
 	}
 
-	// 获取备份目录下的以.zip结尾的文件列表
-	zipFiles, err := tools.GetZipFiles(task.BackupDirectory)
+	// 获取备份目录下的以指定扩展名的文件列表
+	fileExtensionSql := "select file_extension from compress_config where os_type = ?"
+	var fileExtension string
+	if err := db.Get(&fileExtension, fileExtensionSql, runtime.GOOS); err != nil {
+		return fmt.Errorf("获取压缩文件扩展名失败: %w", err)
+	}
+	zipFiles, err := tools.GetZipFiles(task.BackupDirectory, fileExtension)
 	if err != nil {
 		return fmt.Errorf("获取备份目录下的.zip文件失败: %w", err)
 	}
@@ -566,6 +585,117 @@ func runCmdMain(db *sqlx.DB) error {
 	CL.PrintSuccessf("备份文件大小: %s", backupFileSize)
 	CL.PrintSuccessf("备份文件MD5: %s", backupFileMD5)
 	CL.PrintSuccessf("备份文件版本ID: %s", versionID)
+
+	return nil
+}
+
+// logCmdMain 函数，支持分页查询
+// 参数：
+//
+//	db - 数据库连接
+//	page - 页码
+//	pageSize - 每页记录数
+//
+// 返回值：
+//
+//	error - 如果发生错误，返回错误信息；否则返回 nil
+func logCmdMain(db *sqlx.DB, page, pageSize int) error {
+	// 验证分页参数
+	if page < 1 {
+		return fmt.Errorf("页码必须从1开始")
+	}
+	if pageSize <= 0 {
+		return fmt.Errorf("每页记录数必须大于0")
+	}
+
+	// 计算 OFFSET
+	offset := (page - 1) * pageSize
+
+	// 定义查询语句
+	querySql := `
+		SELECT version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash
+		FROM backup_records
+		ORDER BY timestamp DESC
+		LIMIT ?
+		OFFSET ?
+	`
+
+	// 定义结构体来接收查询结果
+	var records []struct {
+		VersionID      string `db:"version_id"`       // 版本ID
+		TaskID         int    `db:"task_id"`          // 任务ID
+		Timestamp      string `db:"timestamp"`        // 时间戳
+		TaskName       string `db:"task_name"`        // 任务名
+		BackupStatus   string `db:"backup_status"`    // 备份状态
+		BackupFileName string `db:"backup_file_name"` // 备份文件名
+		BackupSize     string `db:"backup_size"`      // 备份文件大小
+		BackupPath     string `db:"backup_path"`      // 备份文件路径
+		VersionHash    string `db:"version_hash"`     // 版本哈希
+	}
+
+	// 执行查询
+	if err := db.Select(&records, querySql, pageSize, offset); err != nil {
+		return fmt.Errorf("查询备份记录失败: %w", err)
+	}
+
+	// 创建表格
+	t := table.NewWriter()
+	t.SetOutputMirror(log.Writer())
+	t.AppendHeader(table.Row{"版本ID", "任务ID", "时间戳", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希"})
+
+	// 遍历查询结果，将数据添加到表格中
+	for _, record := range records {
+		// 将时间戳转换为时间对象并格式化为易读格式
+		timestamp, err := time.Parse("20060102150405", record.Timestamp)
+		if err != nil {
+			return fmt.Errorf("解析时间戳失败: %w", err)
+		}
+		formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
+
+		// 将数据添加到表格中
+		t.AppendRow(table.Row{
+			record.VersionID,
+			record.TaskID,
+			formattedTimestamp,
+			record.TaskName,
+			record.BackupStatus,
+			record.BackupFileName,
+			record.BackupSize,
+			record.BackupPath,
+			record.VersionHash,
+		})
+	}
+
+	// 设置表格样式
+	//t.SetStyle(table.StyleLight)
+	//t.SetStyle(table.StyleColoredBright)
+	//t.SetStyle(table.StyleColoredDark)
+	t.SetStyle(table.StyleLight)
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Name: "版本ID", WidthMax: 10},
+		{Name: "任务ID", WidthMax: 10},
+		{Name: "时间戳", WidthMax: 20},
+		{Name: "任务名", WidthMax: 20},
+		{Name: "备份状态", WidthMax: 10},
+		{Name: "备份文件名", WidthMax: 20},
+		{Name: "备份文件大小", WidthMax: 10},
+		{Name: "备份存放目录", WidthMax: 30},
+		{Name: "版本哈希", WidthMax: 20},
+	})
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Name: "版本ID", Align: text.AlignCenter},
+		{Name: "任务ID", Align: text.AlignCenter},
+		{Name: "时间戳", Align: text.AlignLeft},
+		{Name: "任务名", Align: text.AlignLeft},
+		{Name: "备份状态", Align: text.AlignCenter},
+		{Name: "备份文件名", Align: text.AlignLeft},
+		{Name: "备份文件大小", Align: text.AlignCenter},
+		{Name: "备份存放目录", Align: text.AlignLeft},
+		{Name: "版本哈希", Align: text.AlignCenter},
+	})
+
+	// 打印表格
+	t.Render()
 
 	return nil
 }

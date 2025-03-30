@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"gitee.com/MM-Q/colorlib"
+	"github.com/jmoiron/sqlx"
 )
 
 // 定义随机字符集
@@ -308,7 +309,17 @@ func HumanReadableSize(filePath string) (string, error) {
 //
 //	[]string - 匹配的文件路径列表
 //	error - 如果发生错误，返回错误信息；否则返回 nil
-func GetZipFiles(dirPath string) ([]string, error) {
+func GetZipFiles(dirPath, FileExtension string) ([]string, error) {
+	// 检查目录是否存在
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("在获取文件列表时，目录不存在: %s", dirPath)
+	}
+
+	// 检查文件扩展名是否为空
+	if FileExtension == "" {
+		return nil, fmt.Errorf("在获取文件列表时，文件扩展名不能为空")
+	}
+
 	// 用于存储匹配的文件路径
 	var zipFiles []string
 
@@ -318,8 +329,8 @@ func GetZipFiles(dirPath string) ([]string, error) {
 			return fmt.Errorf("遍历文件时出错: %w", err)
 		}
 
-		// 检查文件是否以 .zip 结尾
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".zip") {
+		// 检查文件是否以 指定扩展名 结尾
+		if !info.IsDir() && strings.HasSuffix(info.Name(), FileExtension) {
 			zipFiles = append(zipFiles, path)
 		}
 
@@ -398,53 +409,60 @@ func RetainLatestFiles(files []string, retainCount int) error {
 //
 //	string - 压缩文件的路径
 //	error - 如果发生错误，返回错误信息；否则返回 nil
-func CompressFilesByOS(targetDir, targetName, backupFileNamePath string) (string, error) {
+func CompressFilesByOS(db *sqlx.DB, targetDir, targetName, backupFileNamePath string) (string, error) {
 	// 检查操作系统类型
-	if runtime.GOOS == "linux" {
-		// 构建完整的压缩文件路径
-		backupFilePath := fmt.Sprintf("%s.tgz", backupFileNamePath)
-
-		// 检查tar命令是否可用
-		if _, err := exec.LookPath("tar"); err != nil {
-			return "", fmt.Errorf("tar 命令不可用: %w", err)
-		}
-
-		// 执行 tar 命令进行压缩
-		cmd := exec.Command("tar", "-czf", backupFilePath, targetName)
-		cmd.Dir = targetDir // 设置工作目录为目标目录
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			return "", fmt.Errorf("压缩文件时出错: %w", err)
-		}
-
-		return backupFilePath, nil
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+		return "", fmt.Errorf("不支持的操作系统类型: %s", runtime.GOOS)
 	}
 
-	if runtime.GOOS == "windows" {
-		// 构建完整的压缩文件路径
-		backupFilePath := fmt.Sprintf("%s.zip", backupFileNamePath)
-
-		// 检查7z命令是否可用
-		if _, err := exec.LookPath("7z"); err != nil {
-			return "", fmt.Errorf("7z 命令不可用: %w", err)
-		}
-
-		// 执行 7z 命令进行压缩
-		cmd := exec.Command("7z", "a", "-tzip", backupFilePath, targetName)
-		cmd.Dir = targetDir // 设置工作目录为目标目录
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			return "", fmt.Errorf("压缩文件时出错: %w", err)
-		}
-
-		return backupFilePath, nil
+	// 查询sql
+	qurySql := `SELECT os_type, compress_tool, compress_args, file_extension FROM compress_config where os_type = ?;`
+	var compressConfig struct {
+		OsType        string `db:"os_type"`        // 操作系统类型
+		CompressTool  string `db:"compress_tool"`  // 压缩工具名称
+		CompressArgs  string `db:"compress_args"`  // 压缩工具的参数
+		FileExtension string `db:"file_extension"` // 文件扩展名
 	}
 
-	// 如果操作系统类型不支持，返回错误
-	return "", fmt.Errorf("不支持的操作系统类型")
+	// 查询压缩配置
+	err := db.Get(&compressConfig, qurySql, runtime.GOOS)
+	if err != nil {
+		return "", fmt.Errorf("查询压缩配置时出错: %w", err)
+	}
 
+	// // 打印压缩配置
+	// CL.PrintInfof("压缩配置: %+v", compressConfig)
+
+	// 构建完整的压缩文件路径
+	backupFilePath := fmt.Sprintf("%s%s", backupFileNamePath, compressConfig.FileExtension)
+
+	// 检查tar命令是否可用
+	if _, err := exec.LookPath(compressConfig.CompressTool); err != nil {
+		return "", fmt.Errorf("%s 命令不可用: %w", compressConfig.CompressTool, err)
+	}
+
+	// 拆分 CompressArgs 为独立的参数
+	args := strings.Fields(compressConfig.CompressArgs)
+	args = append(args, backupFilePath, targetName)
+
+	// 执行命令进行压缩
+	cmd := exec.Command(compressConfig.CompressTool, args...)
+	cmd.Dir = targetDir // 设置工作目录为目标目录
+	// 设置标准输出和标准错误输出
+	var out strings.Builder
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+
+	// // 打印执行的命令
+	// CL.PrintInfof("执行命令: %s", cmd.String())
+
+	// // 打印运行的工作目录
+	// CL.PrintInfof("运行的工作目录: %s", cmd.Dir)
+
+	if err := cmd.Run(); err != nil {
+		CL.PrintErrorf("执行打包命令时出错: %s", out.String())
+		return "", fmt.Errorf("压缩文件时出错: %w", err)
+	}
+
+	return backupFilePath, nil
 }
