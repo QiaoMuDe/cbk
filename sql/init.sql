@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS backup_records (
     backup_path TEXT, -- 备份文件的存储路径
     version_hash TEXT, -- 备份版本的哈希值，用于校验
     data_status TEXT, -- 数据状态（例如: 1 表示存在 0 表示不存在）
-    FOREIGN KEY (task_id) REFERENCES backup_tasks (task_id) ON DELETE CASCADE -- 定义外键关系，删除备份任务时自动删除相关备份记录
 );
 
 -- 给备份记录表添加索引，用于提高查询效率 

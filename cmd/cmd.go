@@ -331,6 +331,12 @@ func deleteCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("删除任务失败: %w", err)
 		}
 
+		// 删除备份记录
+		deleteBackupSql := "delete from backup_records where task_name = ?"
+		if _, err := db.Exec(deleteBackupSql, *deleteName); err != nil {
+			return fmt.Errorf("删除备份记录失败: %w", err)
+		}
+
 		// 打印成功信息
 		CL.PrintSuccessf("任务删除成功: %s", *deleteName)
 
@@ -348,21 +354,18 @@ func deleteCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("获取备份存放目录失败: %w", err)
 		}
 
-		// 删除备份存放目录(如果存在)
-		// if _, err := tools.CheckPath(backupDir); err == nil {
-		// 	if err := os.RemoveAll(backupDir); err != nil {
-		// 		return fmt.Errorf("删除备份存放目录失败: %w", err)
-		// 	} else {
-		// 		// 打印成功信息
-		// 		CL.PrintSuccessf("备份存放目录删除成功: %s", backupDir)
-		// 	}
-		// }
 		CL.PrintWarningf("请在稍后，手动删除备份存放目录: %s", backupDir)
 
 		// 删除任务
 		deleteSql := "delete from backup_tasks where task_id = ?"
 		if _, err := db.Exec(deleteSql, *deleteID); err != nil {
 			return fmt.Errorf("删除任务失败: %w", err)
+		}
+
+		// 删除备份记录
+		deleteBackupSql := "delete from backup_records where task_id = ?"
+		if _, err := db.Exec(deleteBackupSql, *deleteID); err != nil {
+			return fmt.Errorf("删除备份记录失败: %w", err)
 		}
 
 		// 打印成功信息
