@@ -1,6 +1,6 @@
 -- 创建备份记录表，用于存储每次备份任务的详细记录
 CREATE TABLE IF NOT EXISTS backup_records (
-    version_id INTEGER PRIMARY KEY, -- 唯一标识每次备份的版本号
+    version_id TEXT PRIMARY KEY, -- 唯一标识每次备份的版本号
     task_id INTEGER, -- 关联的备份任务 ID
     timestamp TEXT, -- 备份任务的时间戳
     task_name TEXT, -- 备份任务的名称
