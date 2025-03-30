@@ -461,12 +461,14 @@ func CompressFilesByOS(db *sqlx.DB, targetDir, targetName, backupFileNamePath st
 	}
 
 	// 拆分 CompressArgs 为独立的参数
-	args := strings.Fields(compressConfig.CompressArgs)
-	args = append(args, backupFilePath, targetName)
+	args := strings.Split(compressConfig.CompressArgs, "|")
+	var argsF []string
+	argsF = append(argsF, args[0], args[1], backupFilePath, targetName)
 
 	// 执行命令进行压缩
-	cmd := exec.Command(compressConfig.CompressTool, args...)
+	cmd := exec.Command(compressConfig.CompressTool, argsF...)
 	cmd.Dir = targetDir // 设置工作目录为目标目录
+	cmd.Env = os.Environ()
 	// 设置标准输出和标准错误输出
 	var out strings.Builder
 	cmd.Stdout = &out
@@ -557,10 +559,9 @@ func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (s
 	cmd := exec.Command(decompressConfig.DecompressTool, argsF...)
 	//cmd.Dir = zipDir // 设置工作目录为目标目录
 	var out strings.Builder
+	cmd.Env = os.Environ()
 	cmd.Stdout = &out
 	cmd.Stderr = &out
-	cmd.Env = os.Environ()
-	CL.PrintDebugf("执行命令: %s", cmd.String())
 
 	// 执行命令
 	if err := cmd.Run(); err != nil {

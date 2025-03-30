@@ -39,9 +39,9 @@ CREATE TABLE IF NOT EXISTS compress_config (
 
 -- 插入初始的压缩配置数据
 INSERT INTO compress_config (os_type, compress_tool, compress_args, file_extension)
-VALUES ('linux', 'tar', '-czf', '.tgz');
+VALUES ('linux', 'tar', '-c|-zf', '.tgz');
 INSERT INTO compress_config (os_type, compress_tool, compress_args, file_extension)
-VALUES ('windows', '7z', 'a -tzip', '.zip');
+VALUES ('windows', '7z', 'a|-tzip', '.zip');
 
 -- 创建解压缩配置表，用于存储不同操作系统下的解压缩工具配置
 CREATE TABLE IF NOT EXISTS decompress_config (
