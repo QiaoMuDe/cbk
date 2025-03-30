@@ -203,7 +203,7 @@ func addCmdMain(db *sqlx.DB) error {
 		if err != nil {
 			return fmt.Errorf("获取用户主目录失败: %w", err)
 		}
-		*addBackup = filepath.Join(tempHome, "data", *addName)
+		*addBackup = filepath.Join(tempHome, ".cbk", "data", *addName)
 	}
 
 	// 检查目标目录或文件是否存在
