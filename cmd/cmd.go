@@ -562,7 +562,7 @@ func runCmdMain(db *sqlx.DB) error {
 
 	// 打印备份信息
 	CL.PrintSuccessf("备份任务 %s 完成", task.TaskName)
-	CL.PrintSuccessf("备份文件: %s", filepath.Join(task.BackupDirectory, zipPath))
+	CL.PrintSuccessf("备份文件: %s", zipPath)
 	CL.PrintSuccessf("备份文件大小: %s", backupFileSize)
 	CL.PrintSuccessf("备份文件MD5: %s", backupFileMD5)
 	CL.PrintSuccessf("备份文件版本ID: %s", versionID)
