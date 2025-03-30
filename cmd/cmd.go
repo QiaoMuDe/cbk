@@ -536,7 +536,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 插入备份记录
-	insertSql := "insert into backup_records (version_id, task_id, tinestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	insertSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	if _, err := db.Exec(insertSql, versionID, *runID, backupTime, task.TaskName, "true", backupFileName, backupFileSize, task.BackupDirectory, backupFileMD5); err != nil {
 		return fmt.Errorf("插入备份记录失败: %w", err)
 	}
