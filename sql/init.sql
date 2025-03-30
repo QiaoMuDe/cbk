@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS decompress_config (
 
 -- 插入初始的解压缩配置数据
 INSERT INTO decompress_config (os_type, decompress_tool, decompress_args, file_extension)
-VALUES ('linux', 'tar', '-xzf | -C', '.tgz');
+VALUES ('linux', 'tar', '-xzf|-C', '.tgz');
 
 INSERT INTO decompress_config (os_type, decompress_tool, decompress_args, file_extension)
-VALUES ('windows', '7z', 'x -tzip | -o', '.zip');
+VALUES ('windows', '7z', 'x -tzip|-o', '.zip');
