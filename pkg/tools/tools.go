@@ -559,6 +559,7 @@ func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (s
 	var out strings.Builder
 	cmd.Stdout = &out
 	cmd.Stderr = &out
+	cmd.Env = os.Environ()
 	CL.PrintDebugf("执行命令: %s", cmd.String())
 
 	// 执行命令
