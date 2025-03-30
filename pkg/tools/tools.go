@@ -395,7 +395,8 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 		}
 
 		// 按小数点分割文件名，获取文件名称部分
-		parts := strings.Split(filePath, ".")
+		baseName := filepath.Base(filePath) // 获取文件名（带扩展名）
+		parts := strings.Split(baseName, ".")
 
 		// 按下划线分割文件名称部分，获取文件名称和扩展名部分
 		nameParts := strings.Split(parts[0], "_")
@@ -444,6 +445,8 @@ func CompressFilesByOS(db *sqlx.DB, targetDir, targetName, backupFileNamePath st
 	err := db.Get(&compressConfig, qurySql, runtime.GOOS)
 	if err != nil {
 		return "", fmt.Errorf("查询压缩配置时出错: %w", err)
+	} else if compressConfig.CompressTool == "" {
+		return "", fmt.Errorf("未找到对应的压缩配置")
 	}
 
 	// // 打印压缩配置
@@ -481,4 +484,86 @@ func CompressFilesByOS(db *sqlx.DB, targetDir, targetName, backupFileNamePath st
 	}
 
 	return backupFilePath, nil
+}
+
+// UncompressFilesByOS 函数根据操作系统类型执行不同的解压命令
+// 参数：
+//
+//  db - 数据库连接
+//	zipDir - 压缩文件所在目录
+//	zipFileName - 压缩文件名
+//	outputPath - 解压输出路径
+//
+// 返回值：
+//
+//	string - 解压文件的路径
+//	error - 如果发生错误，返回错误信息；否则返回 nil
+func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (string, error) {
+	// 检查操作系统类型
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+		return "", fmt.Errorf("不支持的操作系统类型: %s", runtime.GOOS)
+	}
+
+	// 检查解压输出路径是否存在
+	if _, err := CheckPath(outputPath); err != nil {
+		return "", fmt.Errorf("解压输出路径不存在: %w", err)
+	}
+
+	// 查询sql
+	querySql := `select decompress_tool, decompress_args, file_extension from decompress_config where os_type = ?;`
+	var decompressConfig struct {
+		DecompressTool string `db:"decompress_tool"` // 解压工具名称
+		DecompressArgs string `db:"decompress_args"` // 解压工具的参数
+		FileExtension  string `db:"file_extension"`  // 文件扩展名
+	}
+
+	// 查询解压配置
+	err := db.Get(&decompressConfig, querySql, runtime.GOOS)
+	if err != nil {
+		return "", fmt.Errorf("查询解压配置时出错: %w", err)
+	} else if decompressConfig.DecompressTool == "" {
+		return "", fmt.Errorf("未找到对应的解压配置")
+	}
+
+	// 检查解压工具是否可用
+	if _, err := exec.LookPath(decompressConfig.DecompressTool); err != nil {
+		return "", fmt.Errorf("%s 命令不可用: %w", decompressConfig.DecompressTool, err)
+	}
+
+	// 获取解压缩文件的完整路径
+	zipFilePath := filepath.Join(zipDir, zipFileName)
+
+	// 检查解压缩文件是否存在
+	if _, err := CheckPath(zipFilePath); err != nil {
+		return "", fmt.Errorf("解压文件不存在: %w", err)
+	}
+
+	// 检查输出路径下是否存在同名
+	baseName := strings.Split(zipFileName, "_")[0] // 按下划线分割文件名，获取文件名称部分
+	outputPath = filepath.Join(outputPath, baseName)
+	if info, err := CheckPath(outputPath); err != nil {
+		return "", fmt.Errorf("检查解压文件路径时出错: %w", err)
+	} else if info.Exists {
+		return "", fmt.Errorf("解压文件路径已存在: %s", outputPath)
+	}
+
+	// 拆分 DecompressArgs 为独立的参数
+	args := strings.Split(decompressConfig.DecompressArgs, "|")
+	// 构建完整的解压命令, 例如1: tar -xvf test.tar.gz -C /home/test，例如2: 7z x -tzip test.zip -o /home/test
+	args = append(args, args[0], zipFilePath, args[1], outputPath)
+
+	// 执行命令进行解压
+	cmd := exec.Command(decompressConfig.DecompressTool, args...)
+	//cmd.Dir = zipDir // 设置工作目录为目标目录
+	var out strings.Builder
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+
+	// 执行命令
+	if err := cmd.Run(); err != nil {
+		CL.PrintErrorf("执行解压命令时出错: %s", out.String())
+		return "", fmt.Errorf("解压文件时出错: %w", err)
+	}
+
+	return outputPath, nil
 }

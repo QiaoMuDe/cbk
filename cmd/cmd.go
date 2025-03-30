@@ -4,6 +4,7 @@ package cmd
 import (
 	"cbk/pkg/tools"
 	"cbk/pkg/version"
+	_ "embed"
 	"flag"
 	"fmt"
 	"log"
@@ -20,6 +21,9 @@ import (
 
 // 定义全局颜色渲染器
 var CL = colorlib.NewColorLib()
+
+//go:embed help/help.txt
+var HelpText string
 
 // 定义子命令及其参数
 var (
@@ -52,26 +56,22 @@ var (
 	logCmd   = flag.NewFlagSet("log", flag.ExitOnError)
 	logLimit = logCmd.Int("l", 10, "显示的行数")
 
-	// // 子命令：show
-	// showCmd = flag.NewFlagSet("show", flag.ExitOnError)
+	// 子命令：show
+	showCmd = flag.NewFlagSet("show", flag.ExitOnError)
+	showID  = showCmd.Int("id", 0, "任务ID")
 
-	// // 子命令：unpack
-	// unpackCmd = flag.NewFlagSet("unpack", flag.ExitOnError)
-	// unpackName = unpackCmd.String("name", "", "任务名")
-	// unpackNameShort = unpackCmd.String("n", "", "任务名")
-	// unpackID = unpackCmd.Int("id", 0, "任务ID")
-	// unpackVersion = unpackCmd.String("version", "", "指定解压的版本")
-	// unpackVersionShort = unpackCmd.String("v", "", "指定解压的版本")
-	// unpackOutput = unpackCmd.String("output", "", "指定输出的路径")
-	// unpackOutputShort = unpackCmd.String("o", "", "指定输出的路径")
-	// unpackForce = unpackCmd.Bool("force", false, "表示强制覆盖")
-	// unpackForceShort = unpackCmd.Bool("f", false, "表示强制覆盖")
+	// 子命令：unpack
+	unpackCmd       = flag.NewFlagSet("unpack", flag.ExitOnError)
+	unpackID        = unpackCmd.Int("id", 0, "任务ID")
+	unpackVersionID = unpackCmd.String("v", "", "指定解压的版本ID")
+	unpackOutput    = unpackCmd.String("o", ".", "指定输出的路径(默认当前目录)")
+	//unpackForce     = unpackCmd.Bool("f", false, "表示强制覆盖")
 
 	// 子命令：version
 	versionCmd = flag.NewFlagSet("version", flag.ExitOnError)
 
-	// // 子命令：help
-	// helpCmd = flag.NewFlagSet("help", flag.ExitOnError)
+	// 子命令：help
+	helpCmd = flag.NewFlagSet("help", flag.ExitOnError)
 )
 
 // 定义子命令的执行逻辑
@@ -166,17 +166,37 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		}
 		return nil
 	case "show":
-		fmt.Printf("查看指定备份任务的信息: %s\n", args[1])
-		fmt.Println(args[1:])
+		// 解析show命令的参数
+		showCmd.Parse(args[1:])
+		// 执行show命令的逻辑
+		if err := showCmdMain(db); err != nil {
+			return fmt.Errorf("查看指定备份任务的信息失败: %v", err)
+		}
+		return nil
 	case "s":
-		fmt.Printf("查看指定备份任务的信息: %s\n", args[1])
-		fmt.Println(args[1:])
+		// 解析show命令的参数
+		showCmd.Parse(args[1:])
+		// 执行show命令的逻辑
+		if err := showCmdMain(db); err != nil {
+			return fmt.Errorf("查看指定备份任务的信息失败: %v", err)
+		}
+		return nil
 	case "unpack":
-		fmt.Printf("解压备份任务: %s, %s, %s, %s, %s\n", args[1], args[2], args[3], args[4], args[5])
-		fmt.Println(args[1:])
+		// 解析unpack命令的参数
+		unpackCmd.Parse(args[1:])
+		// 执行unpack命令的逻辑
+		if err := unpackCmdMain(db); err != nil {
+			return fmt.Errorf("解压备份任务失败: %v", err)
+		}
+		return nil
 	case "u":
-		fmt.Printf("解压备份任务: %s, %s, %s, %s, %s\n", args[1], args[2], args[3], args[4], args[5])
-		fmt.Println(args[1:])
+		// 解析unpack命令的参数
+		unpackCmd.Parse(args[1:])
+		// 执行unpack命令的逻辑
+		if err := unpackCmdMain(db); err != nil {
+			return fmt.Errorf("解压备份任务失败: %v", err)
+		}
+		return nil
 	// 打印版本信息
 	case "version":
 		versionCmd.Parse(args[1:])
@@ -184,8 +204,11 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		CL.Green(v.SprintVersion("text"))
 	// 打印帮助信息
 	case "help":
-		fmt.Println("帮助信息")
-		fmt.Println(args[1:])
+		// 解析help命令的参数
+		helpCmd.Parse(args[1:])
+		// 执行help命令的逻辑
+		fmt.Println(HelpText)
+		return nil
 	// 未知命令
 	default:
 		return fmt.Errorf("未知命令: %s", args[0])
@@ -405,6 +428,23 @@ func listCmdMain(db *sqlx.DB) error {
 			task.BackupDirectory,
 		})
 	}
+
+	// 设置表格样式
+	// t.SetStyle(table.StyleLight)
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Name: "ID", Align: text.AlignCenter},   // 居中对齐
+		{Name: "任务名", Align: text.AlignLeft},    // 左对齐
+		{Name: "保留数量", Align: text.AlignCenter}, // 居中对齐
+		{Name: "目标目录", Align: text.AlignLeft},   // 左对齐
+		{Name: "备份目录", Align: text.AlignLeft},   // 左对齐
+	})
+	// t.SetColumnConfigs([]table.ColumnConfig{
+	// 	{Name: "ID", WidthMax: 4},
+	// 	{Name: "任务名", WidthMax: 10},
+	// 	{Name: "保留数量", WidthMax: 10},
+	// 	{Name: "目标目录", WidthMax: 30},
+	// 	{Name: "备份目录", WidthMax: 30},
+	// })
 
 	// 渲染表格
 	t.Render()
@@ -718,6 +758,133 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 
 	// 打印表格
 	t.Render()
+
+	return nil
+}
+
+// showCmdMain 查询指定任务ID的备份记录并以表格形式输出
+func showCmdMain(db *sqlx.DB) error {
+	// 检查任务ID是否指定
+	if *showID == 0 {
+		return fmt.Errorf("查询指定备份任务时, 必须指定任务ID")
+	}
+
+	// 构建查询sql语句
+	querySql := "SELECT version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash FROM backup_records WHERE task_id = ? AND data_status = '1' ORDER BY timestamp DESC"
+
+	// 定义存储查询结果的结构体
+	var records []struct {
+		VersionID      string `db:"version_id"`       // 版本ID
+		TaskID         int    `db:"task_id"`          // 任务ID
+		Timestamp      string `db:"timestamp"`        // 时间戳
+		TaskName       string `db:"task_name"`        // 任务名
+		BackupStatus   string `db:"backup_status"`    // 备份状态
+		BackupFileName string `db:"backup_file_name"` // 备份文件名
+		BackupSize     string `db:"backup_size"`      // 备份文件大小
+		BackupPath     string `db:"backup_path"`      // 备份文件路径
+		VersionHash    string `db:"version_hash"`     // 版本哈希
+	}
+
+	// 执行查询
+	if err := db.Select(&records, querySql, *showID); err != nil {
+		return fmt.Errorf("查询备份记录失败: %w", err)
+	}
+
+	// 创建表格
+	t := table.NewWriter()
+	t.SetOutputMirror(log.Writer())
+	t.AppendHeader(table.Row{"版本ID", "任务ID", "时间戳", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份文件路径", "版本哈希"})
+
+	// 将查询结果添加到表格
+	for _, record := range records {
+		// 将时间戳转换为时间对象并格式化为易读格式
+		timestamp, err := time.Parse("20060102150405", record.Timestamp)
+		if err != nil {
+			return fmt.Errorf("解析时间戳失败: %w", err)
+		}
+		formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
+
+		// 将数据添加到表格中
+		t.AppendRow(table.Row{
+			record.VersionID,
+			record.TaskID,
+			formattedTimestamp, // 格式化后的时间戳
+			record.TaskName,
+			record.BackupStatus,
+			record.BackupFileName,
+			record.BackupSize,
+			record.BackupPath,
+			record.VersionHash,
+		})
+	}
+
+	// 设置表格样式
+	//t.SetStyle(table.StyleLight)
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Name: "版本ID", WidthMax: 10},
+		{Name: "任务ID", WidthMax: 10},
+		{Name: "时间戳", WidthMax: 20},
+		{Name: "任务名", WidthMax: 20},
+		{Name: "备份状态", WidthMax: 10},
+		{Name: "备份文件名", WidthMax: 20},
+		{Name: "备份文件大小", WidthMax: 10},
+		{Name: "备份存放目录", WidthMax: 30},
+		{Name: "版本哈希", WidthMax: 20},
+	})
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Name: "版本ID", Align: text.AlignCenter},
+		{Name: "任务ID", Align: text.AlignCenter},
+		{Name: "时间戳", Align: text.AlignLeft},
+		{Name: "任务名", Align: text.AlignLeft},
+		{Name: "备份状态", Align: text.AlignCenter},
+		{Name: "备份文件名", Align: text.AlignLeft},
+		{Name: "备份文件大小", Align: text.AlignCenter},
+		{Name: "备份存放目录", Align: text.AlignLeft},
+		{Name: "版本哈希", Align: text.AlignCenter},
+	})
+
+	// 输出表格
+	t.Render()
+
+	return nil
+}
+
+func unpackCmdMain(db *sqlx.DB) error {
+	// 检查任务ID是否指定
+	if *unpackID == 0 {
+		return fmt.Errorf("解压指定备份任务时, 必须指定任务ID")
+	}
+
+	// 检查versionID是否指定
+	if *unpackVersionID == "" {
+		return fmt.Errorf("解压指定备份任务时, 必须指定版本ID")
+	}
+
+	// 构建查询sql语句
+	querySql := "SELECT version_id, task_id, backup_file_name, backup_path, version_hash FROM backup_records WHERE task_id =? AND version_id =? AND data_status = '1';"
+
+	// 定义存储查询结果的结构体
+	var record struct {
+		VersionID      string `db:"version_id"`       // 版本ID
+		TaskID         int    `db:"task_id"`          // 任务ID
+		BackupFileName string `db:"backup_file_name"` // 备份文件名
+		BackupPath     string `db:"backup_path"`      // 存放路径
+		VersionHash    string `db:"version_hash"`     // 版本哈希
+	}
+
+	// 执行查询
+	if err := db.Get(&record, querySql, *unpackID, *unpackVersionID); err != nil {
+		return fmt.Errorf("查询备份记录失败: %w", err)
+	} else if record.VersionID == "" {
+		return fmt.Errorf("未找到指定任务ID和版本ID的备份记录")
+	}
+
+	// 执行解压操作
+	if outPath, err := tools.UncompressFilesByOS(db, record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
+		return fmt.Errorf("解压备份文件失败: %w", err)
+	} else {
+		CL.PrintSuccessf("已解压到: %s", outPath)
+	}
 
 	return nil
 }

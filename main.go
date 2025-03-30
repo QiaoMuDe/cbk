@@ -64,7 +64,7 @@ func main() {
 	}
 	// 打印帮助信息
 	if *hFlag || *helpFlag {
-		fmt.Println("显示帮助信息")
+		fmt.Println(cmd.HelpText)
 		return
 	}
 
