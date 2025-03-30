@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS backup_records (
     backup_size TEXT, -- 备份文件的大小
     backup_path TEXT, -- 备份文件的存储路径
     version_hash TEXT, -- 备份版本的哈希值，用于校验
-    data_status TEXT, -- 数据状态（例如: 1 表示存在 0 表示不存在）
+    data_status TEXT -- 数据状态（例如: 1 表示存在 0 表示不存在）
 );
 
 -- 给备份记录表添加索引，用于提高查询效率 
