@@ -46,6 +46,7 @@ var (
 	deleteCmd  = flag.NewFlagSet("delete", flag.ExitOnError)
 	deleteID   = deleteCmd.Int("id", 0, "任务ID")
 	deleteName = deleteCmd.String("n", "", "任务名")
+	deleteDirF = deleteCmd.Bool("d", false, "在删除任务时，是否同时删除备份文件。若启用此选项，备份文件将被一同删除")
 
 	// 子命令：edit
 	editCmd  = flag.NewFlagSet("edit", flag.ExitOnError)
@@ -315,14 +316,19 @@ func deleteCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("获取备份存放目录失败: %w", err)
 		}
 
-		// 删除备份存放目录(如果存在)
-		if _, err := tools.CheckPath(backupDir); err == nil {
-			if err := os.RemoveAll(backupDir); err != nil {
-				return fmt.Errorf("删除备份存放目录失败: %w", err)
-			} else {
-				// 打印成功信息
-				CL.PrintSuccessf("备份存放目录删除成功: %s", backupDir)
+		// 如果deleteDir为true, 则删除备份存放目录
+		if *deleteDirF {
+			// 删除备份存放目录(如果存在)
+			if _, err := tools.CheckPath(backupDir); err == nil {
+				if err := os.RemoveAll(backupDir); err != nil {
+					return fmt.Errorf("删除备份存放目录失败: %w", err)
+				} else {
+					// 打印成功信息
+					CL.PrintSuccessf("备份存放目录删除成功: %s", backupDir)
+				}
 			}
+		} else {
+			CL.PrintWarningf("请在稍后，手动删除备份存放目录: %s", backupDir)
 		}
 
 		// 删除任务
@@ -354,7 +360,20 @@ func deleteCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("获取备份存放目录失败: %w", err)
 		}
 
-		CL.PrintWarningf("请在稍后，手动删除备份存放目录: %s", backupDir)
+		// 如果deleteDir为true, 则删除备份存放目录
+		if *deleteDirF {
+			// 删除备份存放目录(如果存在)
+			if _, err := tools.CheckPath(backupDir); err == nil {
+				if err := os.RemoveAll(backupDir); err != nil {
+					return fmt.Errorf("删除备份存放目录失败: %w", err)
+				} else {
+					// 打印成功信息
+					CL.PrintSuccessf("备份存放目录删除成功: %s", backupDir)
+				}
+			}
+		} else {
+			CL.PrintWarningf("请在稍后，手动删除备份存放目录: %s", backupDir)
+		}
 
 		// 删除任务
 		deleteSql := "delete from backup_tasks where task_id = ?"
