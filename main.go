@@ -53,13 +53,23 @@ func main() {
 	// 打印版本信息
 	if *vFlag {
 		v := version.Get()
-		CL.Green(v.SprintVersion("simple"))
+		if versionInfo, err := v.SprintVersion("simple"); err != nil {
+			CL.PrintError(err)
+			os.Exit(1)
+		} else {
+			CL.Green(versionInfo)
+		}
 		return
 	}
 	// 打印更详细的版本信息
 	if *vvFlag {
 		v := version.Get()
-		CL.Green(v.SprintVersion("text"))
+		if versionInfo, err := v.SprintVersion("text"); err != nil {
+			CL.PrintError(err)
+			os.Exit(1)
+		} else {
+			CL.Green(versionInfo)
+		}
 		return
 	}
 	// 打印帮助信息

@@ -203,7 +203,13 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 	case "version":
 		versionCmd.Parse(args[1:])
 		v := version.Get()
-		CL.Green(v.SprintVersion("text"))
+		if versionInfo, err := v.SprintVersion("text"); err != nil {
+			CL.PrintError(err)
+			os.Exit(1)
+		} else {
+			CL.Green(versionInfo)
+		}
+		return nil
 	// 打印帮助信息
 	case "help":
 		// 解析help命令的参数
