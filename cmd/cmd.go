@@ -668,9 +668,6 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 
 	// 设置表格样式
 	//t.SetStyle(table.StyleLight)
-	//t.SetStyle(table.StyleColoredBright)
-	//t.SetStyle(table.StyleColoredDark)
-	t.SetStyle(table.StyleLight)
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Name: "版本ID", WidthMax: 10},
 		{Name: "任务ID", WidthMax: 10},
