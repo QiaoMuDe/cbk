@@ -709,7 +709,7 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 		// 创建表格
 		t := table.NewWriter()
 		t.SetOutputMirror(log.Writer())
-		t.AppendHeader(table.Row{"版本ID", "任务ID", "备份时间", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希"})
+		t.AppendHeader(table.Row{"备份时间", "版本ID", "任务ID", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希"})
 
 		// 遍历查询结果，将数据添加到表格中
 		for _, record := range records {
@@ -851,7 +851,7 @@ func showCmdMain(db *sqlx.DB) error {
 		// 创建表格
 		t := table.NewWriter()
 		t.SetOutputMirror(log.Writer())
-		t.AppendHeader(table.Row{"版本ID", "任务ID", "备份时间", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份文件路径", "版本哈希"})
+		t.AppendHeader(table.Row{"备份时间", "版本ID", "任务ID", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份文件路径", "版本哈希"})
 
 		// 将查询结果添加到表格
 		for _, record := range records {
