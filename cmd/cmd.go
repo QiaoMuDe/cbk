@@ -57,10 +57,12 @@ var (
 	// 子命令：log
 	logCmd   = flag.NewFlagSet("log", flag.ExitOnError)
 	logLimit = logCmd.Int("l", 10, "显示的行数")
+	logView  = logCmd.Bool("v", false, "是否显示详细日志")
 
 	// 子命令：show
-	showCmd = flag.NewFlagSet("show", flag.ExitOnError)
-	showID  = showCmd.Int("id", 0, "任务ID")
+	showCmd  = flag.NewFlagSet("show", flag.ExitOnError)
+	showID   = showCmd.Int("id", 0, "任务ID")
+	showView = showCmd.Bool("v", false, "是否显示详细信息")
 
 	// 子命令：unpack
 	unpackCmd       = flag.NewFlagSet("unpack", flag.ExitOnError)
@@ -702,10 +704,72 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 		return fmt.Errorf("查询备份记录失败: %w", err)
 	}
 
+	// 选择完整格式
+	if *logView {
+		// 创建表格
+		t := table.NewWriter()
+		t.SetOutputMirror(log.Writer())
+		t.AppendHeader(table.Row{"版本ID", "任务ID", "备份时间", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希"})
+
+		// 遍历查询结果，将数据添加到表格中
+		for _, record := range records {
+			// 将时间戳转换为时间对象并格式化为易读格式
+			timestamp, err := time.Parse("20060102150405", record.Timestamp)
+			if err != nil {
+				return fmt.Errorf("解析时间戳失败: %w", err)
+			}
+			formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
+
+			// 将数据添加到表格中
+			t.AppendRow(table.Row{
+				record.VersionID,
+				record.TaskID,
+				formattedTimestamp,
+				record.TaskName,
+				record.BackupStatus,
+				record.BackupFileName,
+				record.BackupSize,
+				record.BackupPath,
+				record.VersionHash,
+			})
+		}
+
+		// 设置表格样式
+		//t.SetStyle(table.StyleLight)
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Name: "版本ID", WidthMax: 10},
+			{Name: "任务ID", WidthMax: 10},
+			{Name: "备份时间", WidthMax: 20},
+			{Name: "任务名", WidthMax: 20},
+			{Name: "备份状态", WidthMax: 10},
+			{Name: "备份文件名", WidthMax: 20},
+			{Name: "备份文件大小", WidthMax: 10},
+			{Name: "备份存放目录", WidthMax: 30},
+			{Name: "版本哈希", WidthMax: 20},
+		})
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Name: "版本ID", Align: text.AlignCenter},
+			{Name: "任务ID", Align: text.AlignCenter},
+			{Name: "备份时间", Align: text.AlignLeft},
+			{Name: "任务名", Align: text.AlignLeft},
+			{Name: "备份状态", Align: text.AlignCenter},
+			{Name: "备份文件名", Align: text.AlignLeft},
+			{Name: "备份文件大小", Align: text.AlignCenter},
+			{Name: "备份存放目录", Align: text.AlignLeft},
+			{Name: "版本哈希", Align: text.AlignCenter},
+		})
+
+		// 打印表格
+		t.Render()
+
+		return nil
+	}
+
+	// 默认为简略格式
 	// 创建表格
 	t := table.NewWriter()
 	t.SetOutputMirror(log.Writer())
-	t.AppendHeader(table.Row{"版本ID", "任务ID", "时间戳", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希"})
+	t.AppendHeader(table.Row{"备份时间", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录"})
 
 	// 遍历查询结果，将数据添加到表格中
 	for _, record := range records {
@@ -718,41 +782,32 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 
 		// 将数据添加到表格中
 		t.AppendRow(table.Row{
-			record.VersionID,
-			record.TaskID,
 			formattedTimestamp,
 			record.TaskName,
 			record.BackupStatus,
 			record.BackupFileName,
 			record.BackupSize,
 			record.BackupPath,
-			record.VersionHash,
 		})
 	}
 
 	// 设置表格样式
 	//t.SetStyle(table.StyleLight)
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Name: "版本ID", WidthMax: 10},
-		{Name: "任务ID", WidthMax: 10},
-		{Name: "时间戳", WidthMax: 20},
+		{Name: "备份时间", WidthMax: 20},
 		{Name: "任务名", WidthMax: 20},
 		{Name: "备份状态", WidthMax: 10},
 		{Name: "备份文件名", WidthMax: 20},
 		{Name: "备份文件大小", WidthMax: 10},
 		{Name: "备份存放目录", WidthMax: 30},
-		{Name: "版本哈希", WidthMax: 20},
 	})
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Name: "版本ID", Align: text.AlignCenter},
-		{Name: "任务ID", Align: text.AlignCenter},
-		{Name: "时间戳", Align: text.AlignLeft},
+		{Name: "备份时间", Align: text.AlignLeft},
 		{Name: "任务名", Align: text.AlignLeft},
 		{Name: "备份状态", Align: text.AlignCenter},
 		{Name: "备份文件名", Align: text.AlignLeft},
 		{Name: "备份文件大小", Align: text.AlignCenter},
 		{Name: "备份存放目录", Align: text.AlignLeft},
-		{Name: "版本哈希", Align: text.AlignCenter},
 	})
 
 	// 打印表格
@@ -791,10 +846,72 @@ func showCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("查询备份记录失败: %w", err)
 	}
 
+	// 检查是否需要选择完整格式
+	if *showView {
+		// 创建表格
+		t := table.NewWriter()
+		t.SetOutputMirror(log.Writer())
+		t.AppendHeader(table.Row{"版本ID", "任务ID", "备份时间", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份文件路径", "版本哈希"})
+
+		// 将查询结果添加到表格
+		for _, record := range records {
+			// 将时间戳转换为时间对象并格式化为易读格式
+			timestamp, err := time.Parse("20060102150405", record.Timestamp)
+			if err != nil {
+				return fmt.Errorf("解析时间戳失败: %w", err)
+			}
+			formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
+
+			// 将数据添加到表格中
+			t.AppendRow(table.Row{
+				record.VersionID,
+				record.TaskID,
+				formattedTimestamp, // 格式化后的时间戳
+				record.TaskName,
+				record.BackupStatus,
+				record.BackupFileName,
+				record.BackupSize,
+				record.BackupPath,
+				record.VersionHash,
+			})
+		}
+
+		// 设置表格样式
+		//t.SetStyle(table.StyleLight)
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Name: "版本ID", WidthMax: 10},
+			{Name: "任务ID", WidthMax: 10},
+			{Name: "备份时间", WidthMax: 20},
+			{Name: "任务名", WidthMax: 20},
+			{Name: "备份状态", WidthMax: 10},
+			{Name: "备份文件名", WidthMax: 20},
+			{Name: "备份文件大小", WidthMax: 10},
+			{Name: "备份存放目录", WidthMax: 30},
+			{Name: "版本哈希", WidthMax: 20},
+		})
+		t.SetColumnConfigs([]table.ColumnConfig{
+			{Name: "版本ID", Align: text.AlignCenter},
+			{Name: "任务ID", Align: text.AlignCenter},
+			{Name: "备份时间", Align: text.AlignLeft},
+			{Name: "任务名", Align: text.AlignLeft},
+			{Name: "备份状态", Align: text.AlignCenter},
+			{Name: "备份文件名", Align: text.AlignLeft},
+			{Name: "备份文件大小", Align: text.AlignCenter},
+			{Name: "备份存放目录", Align: text.AlignLeft},
+			{Name: "版本哈希", Align: text.AlignCenter},
+		})
+
+		// 输出表格
+		t.Render()
+
+		return nil
+	}
+
+	// 默认为简略格式
 	// 创建表格
 	t := table.NewWriter()
 	t.SetOutputMirror(log.Writer())
-	t.AppendHeader(table.Row{"版本ID", "任务ID", "时间戳", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份文件路径", "版本哈希"})
+	t.AppendHeader(table.Row{"版本ID", "任务ID", "备份时间", "任务名"})
 
 	// 将查询结果添加到表格
 	for _, record := range records {
@@ -811,11 +928,6 @@ func showCmdMain(db *sqlx.DB) error {
 			record.TaskID,
 			formattedTimestamp, // 格式化后的时间戳
 			record.TaskName,
-			record.BackupStatus,
-			record.BackupFileName,
-			record.BackupSize,
-			record.BackupPath,
-			record.VersionHash,
 		})
 	}
 
@@ -824,24 +936,14 @@ func showCmdMain(db *sqlx.DB) error {
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Name: "版本ID", WidthMax: 10},
 		{Name: "任务ID", WidthMax: 10},
-		{Name: "时间戳", WidthMax: 20},
+		{Name: "备份时间", WidthMax: 20},
 		{Name: "任务名", WidthMax: 20},
-		{Name: "备份状态", WidthMax: 10},
-		{Name: "备份文件名", WidthMax: 20},
-		{Name: "备份文件大小", WidthMax: 10},
-		{Name: "备份存放目录", WidthMax: 30},
-		{Name: "版本哈希", WidthMax: 20},
 	})
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Name: "版本ID", Align: text.AlignCenter},
 		{Name: "任务ID", Align: text.AlignCenter},
-		{Name: "时间戳", Align: text.AlignLeft},
+		{Name: "备份时间", Align: text.AlignLeft},
 		{Name: "任务名", Align: text.AlignLeft},
-		{Name: "备份状态", Align: text.AlignCenter},
-		{Name: "备份文件名", Align: text.AlignLeft},
-		{Name: "备份文件大小", Align: text.AlignCenter},
-		{Name: "备份存放目录", Align: text.AlignLeft},
-		{Name: "版本哈希", Align: text.AlignCenter},
 	})
 
 	// 输出表格
