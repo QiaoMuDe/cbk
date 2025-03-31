@@ -722,9 +722,9 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 
 			// 将数据添加到表格中
 			t.AppendRow(table.Row{
+				formattedTimestamp, // 备份时间
 				record.VersionID,
 				record.TaskID,
-				formattedTimestamp,
 				record.TaskName,
 				record.BackupStatus,
 				record.BackupFileName,
@@ -782,7 +782,7 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 
 		// 将数据添加到表格中
 		t.AppendRow(table.Row{
-			formattedTimestamp,
+			formattedTimestamp, // 备份时间
 			record.TaskName,
 			record.BackupStatus,
 			record.BackupFileName,
@@ -864,9 +864,9 @@ func showCmdMain(db *sqlx.DB) error {
 
 			// 将数据添加到表格中
 			t.AppendRow(table.Row{
+				formattedTimestamp, // 格式化后的备份时间
 				record.VersionID,
 				record.TaskID,
-				formattedTimestamp, // 格式化后的时间戳
 				record.TaskName,
 				record.BackupStatus,
 				record.BackupFileName,
@@ -911,7 +911,7 @@ func showCmdMain(db *sqlx.DB) error {
 	// 创建表格
 	t := table.NewWriter()
 	t.SetOutputMirror(log.Writer())
-	t.AppendHeader(table.Row{"版本ID", "任务ID", "备份时间", "任务名"})
+	t.AppendHeader(table.Row{"备份时间", "版本ID", "任务ID", "任务名"})
 
 	// 将查询结果添加到表格
 	for _, record := range records {
@@ -924,9 +924,9 @@ func showCmdMain(db *sqlx.DB) error {
 
 		// 将数据添加到表格中
 		t.AppendRow(table.Row{
+			formattedTimestamp, // 格式化后的时间戳
 			record.VersionID,
 			record.TaskID,
-			formattedTimestamp, // 格式化后的时间戳
 			record.TaskName,
 		})
 	}
