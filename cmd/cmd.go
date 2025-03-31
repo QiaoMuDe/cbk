@@ -221,8 +221,6 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 	default:
 		return fmt.Errorf("未知命令: %s", args[0])
 	}
-
-	return nil
 }
 
 // add命令的执行逻辑
