@@ -1,21 +1,21 @@
 package tools
 
 import (
+	"archive/zip"
 	"crypto/md5"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
 
 	"gitee.com/MM-Q/colorlib"
 	"github.com/jmoiron/sqlx"
+	"github.com/schollz/progressbar/v3"
 )
 
 // 定义随机字符集
@@ -363,6 +363,13 @@ func SortFilesByModTime(files []FileWithModTime) []FileWithModTime {
 //
 //	error - 如果发生错误，返回错误信息；否则返回 nil
 func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
+	// 确保保留数量大于0
+	defer func() {
+		if r := recover(); r != nil {
+			CL.Red("从崩溃中恢复:", r)
+		}
+	}()
+
 	// 用于存储文件及其最后修改时间
 	var fileInfos []FileWithModTime
 
@@ -370,7 +377,7 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 	for _, filePath := range files {
 		info, err := os.Stat(filePath)
 		if os.IsNotExist(err) {
-			CL.PrintErrorf("文件不存在，跳过: %s", filePath)
+			CL.Redf("文件不存在，跳过: %s", filePath)
 			continue
 		} else if err != nil {
 			return fmt.Errorf("获取文件信息时出错: %w", err)
@@ -383,7 +390,6 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 
 	// 如果文件数量小于或等于保留数量，直接返回
 	if len(fileInfos) <= retainCount {
-		CL.PrintSuccessf("文件数量小于或等于保留数量，无需清理")
 		return nil
 	}
 
@@ -401,6 +407,11 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 		// 按下划线分割文件名称部分，获取文件名称和扩展名部分
 		nameParts := strings.Split(parts[0], "_")
 
+		// 检查 nameParts 的长度是否足够
+		if len(nameParts) < 2 {
+			return fmt.Errorf("文件名格式不正确，无法解析出足够的部分: %s", filePath)
+		}
+
 		// 构建更新sql
 		updateSql := `update backup_records set data_status =? where task_name =? and timestamp =?;`
 
@@ -408,131 +419,48 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 		if _, err := db.Exec(updateSql, "0", nameParts[0], nameParts[1]); err != nil {
 			return fmt.Errorf("更新备份记录时出错: %w", err)
 		}
-
-		CL.PrintSuccessf("清理历史文件: %s", filePath)
 	}
 
 	return nil
 }
 
-// CompressFilesByOS 函数根据操作系统类型执行不同的压缩命令
-// 参数：
+// CreateZipFromOSPaths 根据目标目录和文件名创建ZIP压缩文件
+// 参数:
 //
-//	targetDir - 目标目录路径
-//	targetName - 要压缩的目标名称
-//	backupFileNamePath - 备份文件的名称
+//	db - 数据库连接(当前未使用，保留参数)
+//	targetDir - 需要压缩的目标目录路径
+//	targetName - 需要压缩的目标名称(文件或目录名)
+//	backupFileNamePath - 备份文件的基础路径(不含扩展名)
 //
-// 返回值：
+// 返回值:
 //
-//	string - 压缩文件的路径
-//	error - 如果发生错误，返回错误信息；否则返回 nil
-func CompressFilesByOS(db *sqlx.DB, targetDir, targetName, backupFileNamePath string) (string, error) {
-	// 检查操作系统类型
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		return "", fmt.Errorf("不支持的操作系统类型: %s", runtime.GOOS)
+//	string - 生成的ZIP文件完整路径
+//	error - 操作过程中遇到的错误
+func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath string) (string, error) {
+	// 构建完整的压缩文件路径(添加扩展名)
+	zipFilePath := fmt.Sprintf("%s%s", backupFileNamePath, ".zip")
+
+	// 切换到目标目录以便后续操作
+	if err := os.Chdir(targetDir); err != nil {
+		return "", fmt.Errorf("切换到目标目录时出错: %w", err)
 	}
 
-	// 查询sql
-	qurySql := `SELECT os_type, compress_tool, compress_args, file_extension FROM compress_config where os_type = ?;`
-	var compressConfig struct {
-		OsType        string `db:"os_type"`        // 操作系统类型
-		CompressTool  string `db:"compress_tool"`  // 压缩工具名称
-		CompressArgs  string `db:"compress_args"`  // 压缩工具的参数
-		FileExtension string `db:"file_extension"` // 文件扩展名
-	}
-
-	// 查询压缩配置
-	err := db.Get(&compressConfig, qurySql, runtime.GOOS)
-	if err != nil {
-		return "", fmt.Errorf("查询压缩配置时出错: %w", err)
-	} else if compressConfig.CompressTool == "" {
-		return "", fmt.Errorf("未找到对应的压缩配置")
-	}
-
-	// // 打印压缩配置
-	// CL.PrintInfof("压缩配置: %+v", compressConfig)
-
-	// 构建完整的压缩文件路径
-	backupFilePath := fmt.Sprintf("%s%s", backupFileNamePath, compressConfig.FileExtension)
-
-	// 检查tar命令是否可用
-	if _, err := exec.LookPath(compressConfig.CompressTool); err != nil {
-		return "", fmt.Errorf("%s 命令不可用: %w", compressConfig.CompressTool, err)
-	}
-
-	// 拆分 CompressArgs 为独立的参数
-	args := strings.Split(compressConfig.CompressArgs, "|")
-	var argsF []string
-	argsF = append(argsF, args[0], args[1], backupFilePath, targetName)
-
-	// 执行命令进行压缩
-	cmd := exec.Command(compressConfig.CompressTool, argsF...)
-	cmd.Dir = targetDir // 设置工作目录为目标目录
-	cmd.Env = os.Environ()
-	// 设置标准输出和标准错误输出
-	var out strings.Builder
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-
-	// // 打印执行的命令
-	// CL.PrintInfof("执行命令: %s", cmd.String())
-
-	// // 打印运行的工作目录
-	// CL.PrintInfof("运行的工作目录: %s", cmd.Dir)
-
-	if err := cmd.Run(); err != nil {
-		CL.PrintErrorf("执行打包命令时出错: %s", out.String())
+	// 调用内部createZip函数执行实际压缩操作
+	if err := createZip(zipFilePath, targetName); err != nil {
 		return "", fmt.Errorf("压缩文件时出错: %w", err)
 	}
 
-	return backupFilePath, nil
+	// 返回生成的ZIP文件完整路径
+	return zipFilePath, nil
 }
 
-// UncompressFilesByOS 函数根据操作系统类型执行不同的解压命令
-// 参数：
-//
-//	 db - 数据库连接
-//		zipDir - 压缩文件所在目录
-//		zipFileName - 压缩文件名
-//		outputPath - 解压输出路径
-//
-// 返回值：
-//
-//	string - 解压文件的路径
-//	error - 如果发生错误，返回错误信息；否则返回 nil
-func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (string, error) {
-	// 检查操作系统类型
-	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-		return "", fmt.Errorf("不支持的操作系统类型: %s", runtime.GOOS)
-	}
-
+func UncompressFilesByOS(zipDir, zipFileName, outputPath string) (string, error) {
 	// 检查解压输出路径是否存在
 	if _, err := CheckPath(outputPath); err != nil {
 		return "", fmt.Errorf("解压输出路径不存在: %w", err)
 	}
 
-	// 查询sql
-	querySql := `select decompress_tool, decompress_args, file_extension from decompress_config where os_type = ?;`
-	var decompressConfig struct {
-		DecompressTool string `db:"decompress_tool"` // 解压工具名称
-		DecompressArgs string `db:"decompress_args"` // 解压工具的参数
-		FileExtension  string `db:"file_extension"`  // 文件扩展名
-	}
-
-	// 查询解压配置
-	err := db.Get(&decompressConfig, querySql, runtime.GOOS)
-	if err != nil {
-		return "", fmt.Errorf("查询解压配置时出错: %w", err)
-	} else if decompressConfig.DecompressTool == "" {
-		return "", fmt.Errorf("未找到对应的解压配置")
-	}
-
-	// 检查解压工具是否可用
-	if _, err := exec.LookPath(decompressConfig.DecompressTool); err != nil {
-		return "", fmt.Errorf("%s 命令不可用: %w", decompressConfig.DecompressTool, err)
-	}
-
-	// 获取解压缩文件的完整路径
+	// 获取解压缩文件的完整路径, 例如: /home/backup/zip/20240506_123456.zip
 	zipFilePath := filepath.Join(zipDir, zipFileName)
 
 	// 检查解压缩文件是否存在
@@ -541,33 +469,178 @@ func UncompressFilesByOS(db *sqlx.DB, zipDir, zipFileName, outputPath string) (s
 	}
 
 	// 检查输出路径下是否存在同名
-	baseName := strings.Split(zipFileName, "_")[0] // 按下划线分割文件名，获取文件名称部分
-	tempPath := filepath.Join(outputPath, baseName)
-	if info, err := CheckPath(tempPath); os.IsNotExist(err) {
-		// 不存在则忽略
-	} else if info.Exists {
-		return "", fmt.Errorf("解压文件路径已存在: %s", tempPath)
+	baseName := strings.Split(zipFileName, "_")[0]  // 按下划线分割文件名，获取文件名称部分
+	tempPath := filepath.Join(outputPath, baseName) // 构建临时路径
+	if _, err := CheckPath(tempPath); err == nil {
+		return "", fmt.Errorf("解压输出路径下存在同名: %s", tempPath)
 	}
 
-	// 拆分 DecompressArgs 为独立的参数
-	args := strings.Split(decompressConfig.DecompressArgs, "|")
-	// 构建完整的解压命令, 例如1: tar -xvf test.tar.gz -C /home/test，例如2: 7z x -tzip test.zip -o /home/test
-	var argsF []string
-	argsF = append(argsF, args[0], zipFilePath, args[1], outputPath)
-
-	// 执行命令进行解压
-	cmd := exec.Command(decompressConfig.DecompressTool, argsF...)
-	//cmd.Dir = zipDir // 设置工作目录为目标目录
-	var out strings.Builder
-	cmd.Env = os.Environ()
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-
-	// 执行命令
-	if err := cmd.Run(); err != nil {
-		CL.PrintErrorf("执行解压命令时出错: %s", out.String())
+	// 调用解压函数
+	if err := unzip(zipFilePath, outputPath); err != nil {
 		return "", fmt.Errorf("解压文件时出错: %w", err)
 	}
 
 	return outputPath, nil
+}
+
+// createZip 函数用于创建ZIP压缩文件
+func createZip(zipFilePath string, sourceDir string) error {
+	// 创建 ZIP 文件
+	zipFile, err := os.Create(zipFilePath)
+	if err != nil {
+		return fmt.Errorf("创建 ZIP 文件失败: %w", err)
+	}
+	defer zipFile.Close()
+
+	// 创建 ZIP 写入器
+	zipWriter := zip.NewWriter(zipFile)
+	defer zipWriter.Close()
+
+	// 获取源目录的总大小，用于进度条
+	totalSize := int64(0)
+	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("遍历目录时出错: %w", err)
+		}
+		if !info.IsDir() {
+			totalSize += info.Size()
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("获取源目录大小失败: %w", err)
+	}
+
+	// 初始化进度条
+	bar := progressbar.DefaultBytes(
+		totalSize,
+		"正在打包",
+	)
+
+	// 遍历目录并添加文件到 ZIP 包
+	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("遍历目录时出错: %w", err)
+		}
+
+		// 获取相对路径，保留顶层目录
+		headerName, err := filepath.Rel(filepath.Dir(sourceDir), path)
+		if err != nil {
+			return fmt.Errorf("获取相对路径失败: %w", err)
+		}
+
+		// 创建 ZIP 文件头
+		header, err := zip.FileInfoHeader(info)
+		if err != nil {
+			return fmt.Errorf("创建 ZIP 文件头失败: %w", err)
+		}
+		header.Name = headerName
+
+		// 如果是目录，直接写入文件头
+		if info.IsDir() {
+			header.Name += "/" // 确保目录名以斜杠结尾
+			if _, err := zipWriter.CreateHeader(header); err != nil {
+				return fmt.Errorf("创建 ZIP 目录失败: %w", err)
+			}
+			return nil
+		}
+
+		// 如果是文件，写入文件内容
+		fileWriter, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			return fmt.Errorf("创建 ZIP 写入器失败: %w", err)
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("打开文件失败: %w", err)
+		}
+		defer file.Close()
+
+		// 使用缓冲区分块读取大文件
+		buffer := make([]byte, 1024*1024) // 1MB 缓冲区
+		for {
+			n, err := file.Read(buffer)
+			if err != nil && err != io.EOF {
+				return fmt.Errorf("读取文件失败: %w", err)
+			}
+			if n == 0 {
+				break
+			}
+			_, err = fileWriter.Write(buffer[:n])
+			if err != nil {
+				return fmt.Errorf("写入 ZIP 文件失败: %w", err)
+			}
+			bar.Add64(int64(n)) // 更新进度条
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("打包目录到 ZIP 失败: %w", err)
+	}
+
+	return nil
+}
+
+// 解压缩 ZIP 文件到指定目录
+func unzip(zipFilePath string, targetDir string) error {
+	// 打开 ZIP 文件
+	zipReader, err := zip.OpenReader(zipFilePath)
+	if err != nil {
+		return fmt.Errorf("打开 ZIP 文件失败: %w", err)
+	}
+	defer zipReader.Close()
+
+	// 确保目标目录存在
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("创建目标目录失败: %w", err)
+	}
+
+	// 获取 ZIP 文件的总大小
+	totalSize := int64(0)
+	for _, file := range zipReader.File {
+		totalSize += int64(file.UncompressedSize64)
+	}
+
+	// 创建进度条
+	bar := progressbar.DefaultBytes(
+		totalSize,
+		"正在解压",
+	)
+
+	// 遍历 ZIP 文件中的每个文件或目录
+	for _, file := range zipReader.File {
+		// 获取目标路径
+		targetPath := filepath.Join(targetDir, file.Name)
+
+		// 创建目录（如果需要）
+		if file.FileInfo().IsDir() {
+			if err := os.MkdirAll(targetPath, file.Mode()); err != nil {
+				return fmt.Errorf("创建目录失败: %w", err)
+			}
+			continue
+		}
+
+		// 创建文件
+		fileWriter, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+		if err != nil {
+			return fmt.Errorf("创建文件失败: %w", err)
+		}
+		defer fileWriter.Close()
+
+		// 打开 ZIP 文件中的文件
+		zipFileReader, err := file.Open()
+		if err != nil {
+			return fmt.Errorf("打开 ZIP 文件中的文件失败: %w", err)
+		}
+		defer zipFileReader.Close()
+
+		// 将文件内容复制到目标文件
+		if _, err := io.Copy(io.MultiWriter(fileWriter, bar), zipFileReader); err != nil {
+			return fmt.Errorf("复制文件内容失败: %w", err)
+		}
+	}
+	return nil
 }

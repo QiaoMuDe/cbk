@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"gitee.com/MM-Q/colorlib"
@@ -206,7 +205,7 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		versionCmd.Parse(args[1:])
 		v := version.Get()
 		if versionInfo, err := v.SprintVersion("text"); err != nil {
-			CL.PrintError(err)
+			CL.Red(err)
 			os.Exit(1)
 		} else {
 			CL.Green(versionInfo)
@@ -252,13 +251,24 @@ func addCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("任务名已存在, 请在更换任务名或删除已有任务后再添加")
 	}
 
+	// 扩展目标目录为绝对路径
+	AbsAddTarget, err := filepath.Abs(filepath.Clean(*addTarget))
+	if err != nil {
+		return fmt.Errorf("获取目标目录绝对路径失败: %w", err)
+	}
+
+	// 获取目标目录的basename作为存放备份的目录名
+	bakDirName := filepath.Base(AbsAddTarget)
+
 	// 如果备份目录为空, 则使用默认值
 	if *addBackup == "" {
+		// 获取用户主目录
 		tempHome, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("获取用户主目录失败: %w", err)
 		}
-		*addBackup = filepath.Join(tempHome, ".cbk", "data", *addName)
+		// 构建备份目录的绝对路径, 格式为: /home/username/.cbk/data/bakDirName
+		*addBackup = filepath.Join(tempHome, ".cbk", "data", bakDirName)
 
 		// 检查备份目录是否存在
 		if _, err := tools.CheckPath(*addBackup); err != nil {
@@ -281,8 +291,8 @@ func addCmdMain(db *sqlx.DB) error {
 			}
 		}
 
-		// 构建备份目录的绝对路径
-		*addBackup = filepath.Join(*addBackup, *addName)
+		// 构建自定义备份目录的绝对路径, 格式为: /path/to/bakDirName
+		*addBackup = filepath.Join(*addBackup, bakDirName)
 
 		// 检查备份目录是否存在
 		if _, err := tools.CheckPath(*addBackup); err != nil {
@@ -292,12 +302,6 @@ func addCmdMain(db *sqlx.DB) error {
 		}
 	}
 
-	// 扩展目标目录为绝对路径
-	AbsAddTarget, err := filepath.Abs(*addTarget)
-	if err != nil {
-		return fmt.Errorf("获取目标目录绝对路径失败: %w", err)
-	}
-
 	// 插入新任务到数据库
 	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count) values(?, ?, ?, ?)"
 	if _, err := db.Exec(insertSql, *addName, AbsAddTarget, *addBackup, *addKeep); err != nil {
@@ -305,7 +309,7 @@ func addCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印成功信息
-	CL.PrintSuccessf("任务添加成功: %s", *addName)
+	CL.Greenf("任务添加成功: %s", *addName)
 	return nil
 }
 
@@ -330,11 +334,11 @@ func deleteCmdMain(db *sqlx.DB) error {
 					return fmt.Errorf("删除备份存放目录失败: %w", err)
 				} else {
 					// 打印成功信息
-					CL.PrintSuccessf("备份存放目录删除成功: %s", backupDir)
+					CL.Greenf("备份存放目录删除成功: %s", backupDir)
 				}
 			}
 		} else {
-			CL.PrintWarningf("请在稍后，手动删除备份存放目录: %s", backupDir)
+			CL.Yellowf("请在稍后，手动删除备份存放目录: %s", backupDir)
 		}
 
 		// 删除任务
@@ -350,7 +354,7 @@ func deleteCmdMain(db *sqlx.DB) error {
 		}
 
 		// 打印成功信息
-		CL.PrintSuccessf("任务删除成功: %s", *deleteName)
+		CL.Greenf("任务删除成功: %s", *deleteName)
 
 		return nil
 	}
@@ -374,11 +378,11 @@ func deleteCmdMain(db *sqlx.DB) error {
 					return fmt.Errorf("删除备份存放目录失败: %w", err)
 				} else {
 					// 打印成功信息
-					CL.PrintSuccessf("备份存放目录删除成功: %s", backupDir)
+					CL.Greenf("备份存放目录删除成功: %s", backupDir)
 				}
 			}
 		} else {
-			CL.PrintWarningf("请在稍后，手动删除备份存放目录: %s", backupDir)
+			CL.Yellowf("请在稍后，手动删除备份存放目录: %s", backupDir)
 		}
 
 		// 删除任务
@@ -394,7 +398,7 @@ func deleteCmdMain(db *sqlx.DB) error {
 		}
 
 		// 打印成功信息
-		CL.PrintSuccessf("任务ID删除成功: %d", *deleteID)
+		CL.Greenf("任务ID删除成功: %d", *deleteID)
 
 		return nil
 	}
@@ -422,7 +426,10 @@ func listCmdMain(db *sqlx.DB) error {
 	// 创建表格
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout) // 使用标准输出作为输出目标
+	// 设置表头
 	t.AppendHeader(table.Row{"ID", "任务名", "保留数量", "目标目录", "备份目录"})
+
+	// 设置列配置
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Name: "ID", Align: text.AlignCenter},
 		{Name: "任务名", Align: text.AlignLeft},
@@ -430,6 +437,13 @@ func listCmdMain(db *sqlx.DB) error {
 		{Name: "目标目录", Align: text.AlignLeft},
 		{Name: "备份目录", Align: text.AlignLeft},
 	})
+	// t.SetColumnConfigs([]table.ColumnConfig{
+	// 	{Name: "ID", WidthMax: 4},
+	// 	{Name: "任务名", WidthMax: 10},
+	// 	{Name: "保留数量", WidthMax: 10},
+	// 	{Name: "目标目录", WidthMax: 30},
+	// 	{Name: "备份目录", WidthMax: 30},
+	// })
 
 	// 添加数据行
 	for _, task := range tasks {
@@ -441,23 +455,6 @@ func listCmdMain(db *sqlx.DB) error {
 			task.BackupDirectory,
 		})
 	}
-
-	// 设置表格样式
-	// t.SetStyle(table.StyleLight)
-	t.SetColumnConfigs([]table.ColumnConfig{
-		{Name: "ID", Align: text.AlignCenter},   // 居中对齐
-		{Name: "任务名", Align: text.AlignLeft},    // 左对齐
-		{Name: "保留数量", Align: text.AlignCenter}, // 居中对齐
-		{Name: "目标目录", Align: text.AlignLeft},   // 左对齐
-		{Name: "备份目录", Align: text.AlignLeft},   // 左对齐
-	})
-	// t.SetColumnConfigs([]table.ColumnConfig{
-	// 	{Name: "ID", WidthMax: 4},
-	// 	{Name: "任务名", WidthMax: 10},
-	// 	{Name: "保留数量", WidthMax: 10},
-	// 	{Name: "目标目录", WidthMax: 30},
-	// 	{Name: "备份目录", WidthMax: 30},
-	// })
 
 	// 渲染表格
 	t.Render()
@@ -515,7 +512,7 @@ func editCmdMain(db *sqlx.DB) error {
 		// 		return fmt.Errorf("重命名备份存放目录失败: %w", err)
 		// 	}
 		// }
-		CL.PrintWarningf("请在稍后，手动重命名备份存放目录: %s -> %s", backupDir, filepath.Join(filepath.Dir(backupDir), *editName))
+		CL.Yellowf("请在稍后，手动重命名备份存放目录: %s -> %s", backupDir, filepath.Join(filepath.Dir(backupDir), *editName))
 
 		// 更新备份存放目录
 		updateBackupDirSql := "update backup_tasks set backup_directory = ? where task_id = ?"
@@ -524,11 +521,8 @@ func editCmdMain(db *sqlx.DB) error {
 		}
 
 		// 打印成功信息
-		CL.PrintSuccessf("备份存放目录已自动跟随任务名修改为: %s", filepath.Join(filepath.Dir(backupDir), *editName))
+		CL.Greenf("备份存放目录已自动跟随任务名修改为: %s", filepath.Join(filepath.Dir(backupDir), *editName))
 	}
-
-	// 打印成功信息
-	CL.PrintSuccess("更新成功!")
 
 	// 查询并打印分别打印任务ID的当前任务信息
 	querySql := "select task_name, retention_count from backup_tasks where task_id =?"
@@ -536,9 +530,12 @@ func editCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("查询更新后的任务失败: %w", err)
 	}
 
+	// 打印成功信息
+	CL.Greenf("更新成功!")
+
 	// 打印任务信息
-	CL.PrintSuccessf("任务ID %d 的当前任务名为: %s", *editID, task.TaskName)
-	CL.PrintSuccessf("任务ID %d 的当前保留数量为: %d", *editID, task.RetentionCount)
+	CL.Greenf("任务ID %d 的当前任务名为: %s", *editID, task.TaskName)
+	CL.Greenf("任务ID %d 的当前保留数量为: %d", *editID, task.RetentionCount)
 
 	return nil
 }
@@ -589,8 +586,7 @@ func runCmdMain(db *sqlx.DB) error {
 	backupFileNamePath := filepath.Join(task.BackupDirectory, backupFileNamePrefix) // 获取构建的备份文件路径
 
 	// 执行备份任务
-	CL.PrintSuccess("开始备份任务...")
-	zipPath, err := tools.CompressFilesByOS(db, targetDir, targetName, backupFileNamePath)
+	zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath)
 	if err != nil {
 		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "0", "-"); err != nil {
@@ -626,12 +622,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 获取备份目录下的以指定扩展名的文件列表
-	fileExtensionSql := "select file_extension from compress_config where os_type = ?"
-	var fileExtension string
-	if err := db.Get(&fileExtension, fileExtensionSql, runtime.GOOS); err != nil {
-		return fmt.Errorf("获取文件扩展名失败: %w", err)
-	}
-	zipFiles, err := tools.GetZipFiles(task.BackupDirectory, fileExtension)
+	zipFiles, err := tools.GetZipFiles(task.BackupDirectory, ".zip")
 	if err != nil {
 		return fmt.Errorf("获取备份目录下的.zip文件失败: %w", err)
 	}
@@ -644,11 +635,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印备份信息
-	CL.PrintSuccessf("备份任务 %s 完成", task.TaskName)
-	CL.PrintSuccessf("备份文件: %s", zipPath)
-	CL.PrintSuccessf("备份文件大小: %s", backupFileSize)
-	CL.PrintSuccessf("备份文件MD5: %s", backupFileMD5)
-	CL.PrintSuccessf("备份文件版本ID: %s", versionID)
+	CL.Greenf("备份完成: %s", task.TaskName)
 
 	return nil
 }
@@ -996,10 +983,10 @@ func unpackCmdMain(db *sqlx.DB) error {
 	}
 
 	// 执行查询
-	if err := db.Get(&record, querySql, *unpackID, *unpackVersionID); err != nil {
+	if err := db.Get(&record, querySql, *unpackID, *unpackVersionID); err == sql.ErrNoRows {
+		return fmt.Errorf("未找到指定任务ID %d 和版本ID %s 的备份记录", *unpackID, *unpackVersionID)
+	} else if err != nil {
 		return fmt.Errorf("查询备份记录失败: %w", err)
-	} else if record.VersionID == "" {
-		return fmt.Errorf("未找到指定任务ID和版本ID的备份记录")
 	}
 
 	// 构建备份文件路径
@@ -1018,11 +1005,10 @@ func unpackCmdMain(db *sqlx.DB) error {
 	}
 
 	// 执行解压操作
-	CL.PrintSuccess("开始解压备份文件...")
-	if outPath, err := tools.UncompressFilesByOS(db, record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
+	if outPath, err := tools.UncompressFilesByOS(record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
 		return fmt.Errorf("解压备份文件失败: %w", err)
 	} else {
-		CL.PrintSuccessf("已解压 %s -> %s", record.BackupFileName, outPath)
+		CL.Greenf("已解压 %s -> %s", record.BackupFileName, outPath)
 	}
 
 	return nil
