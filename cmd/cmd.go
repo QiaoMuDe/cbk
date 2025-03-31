@@ -635,7 +635,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印备份信息
-	CL.Greenf("备份完成: %s", task.TaskName)
+	//CL.Greenf("备份完成: %s", task.TaskName)
 
 	return nil
 }
@@ -1005,10 +1005,8 @@ func unpackCmdMain(db *sqlx.DB) error {
 	}
 
 	// 执行解压操作
-	if outPath, err := tools.UncompressFilesByOS(record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
+	if _, err := tools.UncompressFilesByOS(record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
 		return fmt.Errorf("解压备份文件失败: %w", err)
-	} else {
-		CL.Greenf("已解压 %s -> %s", record.BackupFileName, outPath)
 	}
 
 	return nil
