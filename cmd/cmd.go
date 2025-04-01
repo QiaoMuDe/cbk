@@ -230,6 +230,11 @@ func addCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("任务名不能为空")
 	}
 
+	// 检查任务名是否非法字符
+	if tools.ContainsSpecialChars(*addName) {
+		return fmt.Errorf("任务名含非法字符, 请重试")
+	}
+
 	// 检查目标目录是否为空
 	if *addTarget == "" {
 		return fmt.Errorf("目标目录不能为空")

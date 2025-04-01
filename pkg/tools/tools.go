@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"gitee.com/MM-Q/colorlib"
 	"github.com/jmoiron/sqlx"
@@ -674,4 +675,33 @@ func unzip(zipFilePath string, targetDir string) error {
 	}
 
 	return nil
+}
+
+// ContainsSpecialChars 检测字符串是否包含特殊字符或危险字符
+// 参数：s - 需要检测的字符串
+// 返回：true 如果包含特殊字符或危险字符，false 否则
+func ContainsSpecialChars(s string) bool {
+	// 定义危险字符集合，使用哈希表存储以提高查找效率
+	dangerousChars := map[rune]bool{
+		'<': true, '>': true, '"': true, '\'': true, '\\': true, '`': true, ';': true,
+		'%': true, '$': true, '#': true, '@': true, '&': true, '*': true, '(': true,
+		')': true, '{': true, '}': true, '[': true, ']': true, '|': true, '!': true,
+		'^': true, '~': true, '=': true, '+': true, '-': true, '.': true, ',': true,
+		'/': true, '?': true, ':': true,
+	}
+
+	// 遍历字符串中的每个字符
+	for _, char := range s {
+		// 检查是否为危险字符
+		if dangerousChars[char] {
+			return true
+		}
+		// 检查是否为控制字符或非打印字符
+		if unicode.IsControl(char) || !unicode.IsPrint(char) {
+			return true
+		}
+	}
+
+	// 如果没有找到任何特殊或危险字符，返回false
+	return false
 }
