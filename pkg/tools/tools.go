@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -56,18 +57,18 @@ func GenerateID(randomLength int) string {
 
 	// 使用strings.Builder进行字符串拼接
 	var builder strings.Builder
+	builder.Grow(8 + randomLength) // 预分配内存
+
+	// 获取时间戳的后8位并转换为字符串
+	timestampStr := strconv.FormatInt(timestamp%1e8, 10)
 
 	// 将时间戳转换为字符串并拼接到builder中
-	builder.WriteString(fmt.Sprintf("%d", timestamp))
+	builder.WriteString(timestampStr)
 
-	// 预先分配足够的内存
-	randomPart := make([]byte, randomLength)
+	// 生成随机字符部分
 	for i := 0; i < randomLength; i++ {
-		randomPart[i] = charset[globalRand.Intn(len(charset))]
+		builder.WriteByte(charset[globalRand.Intn(len(charset))])
 	}
-
-	// 将随机字符部分拼接到builder中
-	builder.Write(randomPart)
 
 	// 返回最终拼接的字符串
 	return builder.String()

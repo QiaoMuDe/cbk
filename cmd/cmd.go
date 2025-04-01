@@ -530,7 +530,7 @@ func editCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印成功信息
-	CL.PrintOkf("更新成功!")
+	CL.PrintOk("更新成功!")
 
 	// 打印任务信息
 	CL.PrintOkf("任务ID %d 的当前任务名为: %s", *editID, task.TaskName)
@@ -953,7 +953,7 @@ func unpackCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印提示信息
-	CL.PrintOkf("正在启动解压任务...")
+	CL.PrintOk("正在启动解压任务...")
 
 	// 检查*unpackID是否是已存在的
 	var taskCount int
