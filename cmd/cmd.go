@@ -573,7 +573,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印提示信息
-	CL.PrintOkf("备份任务 [%s] 已启动，正在运行中……\n", task.TaskName)
+	CL.PrintOkf("备份任务 [%s] 已启动，正在运行中……", task.TaskName)
 
 	// 构建备份文件名
 	backupTime := time.Now().Format("20060102150405")
