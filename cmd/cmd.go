@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"gitee.com/MM-Q/colorlib"
@@ -206,8 +205,7 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		versionCmd.Parse(args[1:])
 		v := version.Get()
 		if versionInfo, err := v.SprintVersion("text"); err != nil {
-			CL.Red(err)
-			os.Exit(1)
+			return fmt.Errorf("获取版本信息失败: %v", err)
 		} else {
 			CL.Green(versionInfo)
 		}
@@ -310,7 +308,7 @@ func addCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印成功信息
-	CL.Greenf("任务添加成功: %s", *addName)
+	CL.PrintOkf("任务添加成功: %s", *addName)
 	return nil
 }
 
@@ -335,11 +333,11 @@ func deleteCmdMain(db *sqlx.DB) error {
 					return fmt.Errorf("删除备份存放目录失败: %w", err)
 				} else {
 					// 打印成功信息
-					CL.Greenf("备份存放目录删除成功: %s", backupDir)
+					CL.PrintOkf("备份存放目录删除成功: %s", backupDir)
 				}
 			}
 		} else {
-			CL.Yellowf("请在稍后，手动删除备份存放目录: %s", backupDir)
+			CL.PrintWarnf("请在稍后，手动删除备份存放目录: %s", backupDir)
 		}
 
 		// 删除任务
@@ -355,7 +353,7 @@ func deleteCmdMain(db *sqlx.DB) error {
 		}
 
 		// 打印成功信息
-		CL.Greenf("任务删除成功: %s", *deleteName)
+		CL.PrintOkf("任务删除成功: %s", *deleteName)
 
 		return nil
 	}
@@ -379,11 +377,11 @@ func deleteCmdMain(db *sqlx.DB) error {
 					return fmt.Errorf("删除备份存放目录失败: %w", err)
 				} else {
 					// 打印成功信息
-					CL.Greenf("备份存放目录删除成功: %s", backupDir)
+					CL.PrintOkf("备份存放目录删除成功: %s", backupDir)
 				}
 			}
 		} else {
-			CL.Yellowf("请在稍后，手动删除备份存放目录: %s", backupDir)
+			CL.PrintWarnf("请在稍后，手动删除备份存放目录: %s", backupDir)
 		}
 
 		// 删除任务
@@ -399,7 +397,7 @@ func deleteCmdMain(db *sqlx.DB) error {
 		}
 
 		// 打印成功信息
-		CL.Greenf("任务ID删除成功: %d", *deleteID)
+		CL.PrintOkf("任务ID删除成功: %d", *deleteID)
 
 		return nil
 	}
@@ -513,7 +511,7 @@ func editCmdMain(db *sqlx.DB) error {
 		// 		return fmt.Errorf("重命名备份存放目录失败: %w", err)
 		// 	}
 		// }
-		CL.Yellowf("请在稍后，手动重命名备份存放目录: %s -> %s", backupDir, filepath.Join(filepath.Dir(backupDir), *editName))
+		CL.PrintWarnf("请在稍后，手动重命名备份存放目录: %s -> %s", backupDir, filepath.Join(filepath.Dir(backupDir), *editName))
 
 		// 更新备份存放目录
 		updateBackupDirSql := "update backup_tasks set backup_directory = ? where task_id = ?"
@@ -522,7 +520,7 @@ func editCmdMain(db *sqlx.DB) error {
 		}
 
 		// 打印成功信息
-		CL.Greenf("备份存放目录已自动跟随任务名修改为: %s", filepath.Join(filepath.Dir(backupDir), *editName))
+		CL.PrintOkf("备份存放目录已自动跟随任务名修改为: %s", filepath.Join(filepath.Dir(backupDir), *editName))
 	}
 
 	// 查询并打印分别打印任务ID的当前任务信息
@@ -532,11 +530,11 @@ func editCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印成功信息
-	CL.Greenf("更新成功!")
+	CL.PrintOkf("更新成功!")
 
 	// 打印任务信息
-	CL.Greenf("任务ID %d 的当前任务名为: %s", *editID, task.TaskName)
-	CL.Greenf("任务ID %d 的当前保留数量为: %d", *editID, task.RetentionCount)
+	CL.PrintOkf("任务ID %d 的当前任务名为: %s", *editID, task.TaskName)
+	CL.PrintOkf("任务ID %d 的当前保留数量为: %d", *editID, task.RetentionCount)
 
 	return nil
 }
@@ -575,7 +573,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印提示信息
-	fmt.Printf("备份任务 [%s] 已启动，正在运行中……\n", task.TaskName)
+	CL.PrintOkf("备份任务 [%s] 已启动，正在运行中……\n", task.TaskName)
 
 	// 构建备份文件名
 	backupTime := time.Now().Format("20060102150405")
@@ -589,32 +587,14 @@ func runCmdMain(db *sqlx.DB) error {
 	targetName := filepath.Base(task.TargetDirectory)                               // 获取目标目录的最后一个部分
 	backupFileNamePath := filepath.Join(task.BackupDirectory, backupFileNamePrefix) // 获取构建的备份文件路径
 
-	// 定义一个同步等待锁
-	var w sync.WaitGroup
-	w.Add(1)
-
-	// 定义接收错误的变量
-	var zipPath string
-	var backupErr error
-
-	// 启动一个协程执行备份任务
-	go func() {
-		defer w.Done()
-		// 执行备份任务
-		zipPath, backupErr = tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath)
-		if backupErr != nil {
-			errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-			if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "0", "-"); err != nil {
-				backupErr = fmt.Errorf("插入备份记录失败: %w", backupErr)
-			}
-			backupErr = fmt.Errorf("备份任务失败: %w", backupErr)
+	// 执行备份任务
+	zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath)
+	if err != nil {
+		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "0", "-"); err != nil {
+			return fmt.Errorf("插入备份记录失败: %w", err)
 		}
-	}()
-
-	w.Wait()
-	// 检查协程是否发生错误
-	if backupErr != nil {
-		return backupErr
+		return fmt.Errorf("备份任务失败: %w", err)
 	}
 
 	// 获取备份文件的后8位MD5哈希值
@@ -657,7 +637,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印成功信息
-	fmt.Println(`备份成功!`)
+	CL.PrintOkf(`备份成功!`)
 
 	return nil
 }
@@ -972,6 +952,9 @@ func unpackCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("解压指定备份任务时, 必须指定版本ID")
 	}
 
+	// 打印提示信息
+	CL.PrintOkf("正在启动解压任务...")
+
 	// 检查*unpackID是否是已存在的
 	var taskCount int
 	if err := db.Get(&taskCount, "SELECT COUNT(*) FROM backup_records WHERE task_id = ? AND data_status = '1';", *unpackID); err == sql.ErrNoRows {
@@ -1022,14 +1005,20 @@ func unpackCmdMain(db *sqlx.DB) error {
 	// 获取备份文件的后8位哈希值
 	if backupFileHash, err := tools.GetFileMD5Last8(backupFilePath); err != nil {
 		return fmt.Errorf("获取备份文件哈希失败: %w", err)
-	} else if backupFileHash != record.VersionHash {
-		return fmt.Errorf("备份文件 %s 的版本 %s 的哈希值与记录不匹配，文件可能已损坏或被篡改。请尝试选择其他版本的备份文件重试", backupFilePath, record.VersionID)
+	} else {
+		// 比较哈希值是否一致
+		if backupFileHash != record.VersionHash {
+			return fmt.Errorf("备份文件 %s 的版本 %s 的哈希值与记录不匹配，文件可能已损坏或被篡改。请尝试选择其他版本的备份文件重试", backupFilePath, record.VersionID)
+		}
 	}
 
 	// 执行解压操作
-	if _, err := tools.UncompressFilesByOS(record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
+	if unZipPath, err := tools.UncompressFilesByOS(record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
 		return fmt.Errorf("解压备份文件失败: %w", err)
+	} else {
+		// 打印提示信息
+		CL.PrintOkf("解压任务完成, 输出路径: %s", unZipPath)
+		return nil
 	}
 
-	return nil
 }

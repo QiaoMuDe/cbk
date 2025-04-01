@@ -383,7 +383,7 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 	// 确保保留数量大于0
 	defer func() {
 		if r := recover(); r != nil {
-			CL.Red("从崩溃中恢复:", r)
+			CL.PrintErr("从崩溃中恢复:", r)
 		}
 	}()
 
@@ -394,7 +394,7 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 	for _, filePath := range files {
 		info, err := os.Stat(filePath)
 		if os.IsNotExist(err) {
-			CL.Redf("文件不存在，跳过: %s", filePath)
+			CL.PrintErrf("文件不存在，跳过: %s", filePath)
 			continue
 		} else if err != nil {
 			return fmt.Errorf("获取文件信息时出错: %w", err)

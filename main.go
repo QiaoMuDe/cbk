@@ -31,13 +31,13 @@ func main() {
 	// 初始化数据库
 	db, err := initDB()
 	if err != nil {
-		CL.Redf("初始化数据库失败: %v", err)
+		CL.PrintErrf("初始化数据库失败: %v", err)
 		os.Exit(1)
 	}
 
 	// 初始化数据目录
 	if err := initDataDir(); err != nil {
-		CL.Redf("初始化数据目录失败: %v", err)
+		CL.PrintErrf("初始化数据目录失败: %v", err)
 		os.Exit(1)
 	}
 
@@ -54,7 +54,7 @@ func main() {
 	if *vFlag {
 		v := version.Get()
 		if versionInfo, err := v.SprintVersion("simple"); err != nil {
-			CL.Red(err)
+			CL.PrintErr(err)
 			os.Exit(1)
 		} else {
 			CL.Green(versionInfo)
@@ -65,7 +65,7 @@ func main() {
 	if *vvFlag {
 		v := version.Get()
 		if versionInfo, err := v.SprintVersion("text"); err != nil {
-			CL.Red(err)
+			CL.PrintErr(err)
 			os.Exit(1)
 		} else {
 			CL.Green(versionInfo)
@@ -90,7 +90,7 @@ func main() {
 	// 执行子命令
 	err = cmd.ExecuteCommands(db, args)
 	if err != nil {
-		CL.Red(err)
+		CL.PrintErr(err)
 		os.Exit(1)
 	}
 }

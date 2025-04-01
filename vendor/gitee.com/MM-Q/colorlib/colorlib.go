@@ -9,10 +9,12 @@ type ColorLib struct {
 	// 空结构体，用于实现接口
 	LevelMap map[string]string // LevelMap 是一个映射，用于将日志级别映射到对应的前缀,// 日志级别映射到对应的前缀, 后面留空, 方便后面拼接提示内容
 	ColorMap map[string]string // colorMap 是一个映射，用于将颜色名称映射到对应的 ANSI 颜色代码。
+	LvlMap   map[string]string // LvlMap 是一个映射，用于将日志级别映射到对应的日志级别名称。
 }
 
 // ColorLibInterface 是一个接口，定义了一组方法，用于打印和返回带有颜色的文本。
 type ColorLibInterface interface {
+	// 需要占位符的方法(自带换行符)
 	Bluef(format string, a ...any)           // 打印蓝色信息到控制台（带占位符）
 	Greenf(format string, a ...any)          // 打印绿色信息到控制台（带占位符）
 	Redf(format string, a ...any)            // 打印红色信息到控制台（带占位符）
@@ -29,7 +31,7 @@ type ColorLibInterface interface {
 	PrintInfof(format string, a ...any)      // 打印信息到控制台（带占位符）
 	PrintDebugf(format string, a ...any)     // 打印调试信息到控制台（带占位符）
 
-	// 新增不带占位符的方法
+	// 直接打印信息, 无需占位符
 	Blue(msg ...any)           // 打印蓝色信息到控制台, 无需占位符
 	Green(msg ...any)          // 打印绿色信息到控制台, 无需占位符
 	Red(msg ...any)            // 打印红色信息到控制台, 无需占位符
@@ -91,12 +93,35 @@ type ColorLibInterface interface {
 	Lwhitef(format string, a ...any)          // 打印亮白色信息到控制台（带占位符）
 	Slwhite(msg ...any) string                // 返回构造后的亮白色字符串, 无需占位符
 	Slwhitef(format string, a ...any) string  // 返回构造后的亮白色字符串（带占位符）
+
+	// 新增简洁版的方法, 无需占位符
+	PrintOk(msg ...any)   // 打印成功信息到控制台, 无需占位符
+	PrintErr(msg ...any)  // 打印错误信息到控制台, 无需占位符
+	PrintInf(msg ...any)  // 打印信息到控制台, 无需占位符
+	PrintDbg(msg ...any)  // 打印调试信息到控制台, 无需占位符
+	PrintWarn(msg ...any) // 打印警告信息到控制台, 无需占位符
+
+	// 新增简洁版的方法, 带占位符
+	PrintOkf(format string, a ...any)   // 打印成功信息到控制台（带占位符）
+	PrintErrf(format string, a ...any)  // 打印错误信息到控制台（带占位符）
+	PrintInff(format string, a ...any)  // 打印信息到控制台（带占位符）
+	PrintDbgf(format string, a ...any)  // 打印调试信息到控制台（带占位符）
+	PrintWarnf(format string, a ...any) // 打印警告信息到控制台（带占位符）
 }
 
 // NewColorLib 函数用于创建一个新的 ColorLib 实例。
 func NewColorLib() *ColorLib {
 	// 创建一个新的 ColorLib 实例
 	cl := &ColorLib{
+		// LvlMap 是一个映射，用于将日志级别映射到对应的日志级别名称。
+		LvlMap: map[string]string{
+			"ok":   "ok: ",
+			"err":  "err: ",
+			"inf":  "info: ",
+			"dbg":  "debug: ",
+			"warn": "warn:",
+		},
+		// LevelMap 是一个映射，用于将日志级别映射到对应的前缀。
 		LevelMap: map[string]string{
 			"success": "[Success] ", // 成功信息级别的前缀
 			"error":   "[Error] ",   // 错误信息级别的前缀
@@ -104,6 +129,7 @@ func NewColorLib() *ColorLib {
 			"info":    "[Info] ",    // 信息信息级别的前缀
 			"debug":   "[Debug] ",   // 调试信息级别的前缀
 		},
+		// colorMap 是一个映射，用于将颜色名称映射到对应的 ANSI 颜色代码。
 		ColorMap: map[string]string{
 			"black":   "30", // 黑色文本的 ANSI 颜色代码
 			"red":     "31", // 红色文本的 ANSI 颜色代码
@@ -383,6 +409,33 @@ func (c *ColorLib) Spurple(msg ...any) string {
 func (c *ColorLib) PromptMsg(level, color, format string, a ...any) {
 	// 获取指定级别对应的前缀
 	prefix, ok := c.LevelMap[level]
+	if !ok {
+		fmt.Println("Invalid level:", level)
+		return
+	}
+
+	// 创建一个 strings.Builder 来构建消息
+	var message strings.Builder
+	message.WriteString(prefix)
+
+	// 如果没有参数，直接打印前缀
+	if len(a) == 0 {
+		c.printWithColor(color, message.String())
+		return
+	}
+
+	// 使用 fmt.Sprint 将所有参数拼接成一个字符串
+	combinedMsg := fmt.Sprintf(format, a...)
+	message.WriteString(combinedMsg)
+
+	// 打印最终消息
+	c.printWithColor(color, message.String())
+}
+
+// PMsg 方法用于打印带有颜色和前缀的消息。
+func (c *ColorLib) PMsg(level, color, format string, a ...any) {
+	// 获取指定级别对应的前缀
+	prefix, ok := c.LvlMap[level]
 	if !ok {
 		fmt.Println("Invalid level:", level)
 		return
@@ -960,4 +1013,100 @@ func (c *ColorLib) Slwhitef(format string, a ...any) string {
 
 	// 调用 returnWithColor 方法，传入格式化后的字符串
 	return c.returnWithColor("lwhite", formattedMsg)
+}
+
+// 扩展简洁方法 错误 成功 警告 信息 调试
+// PrintOk 方法用于将传入的参数以绿色文本形式打印到控制台，并在文本前添加一个表示成功的标志（不带占位符）。
+func (c *ColorLib) PrintOk(msg ...any) {
+	if len(msg) == 0 {
+		// 如果没有传入任何参数，直接返回空字符串或默认消息
+		c.PMsg("ok", "green", "%s", "")
+		return
+	}
+
+	// 使用 fmt.Sprint 将所有参数拼接成一个字符串
+	combinedMsg := fmt.Sprint(msg...)
+	c.PMsg("ok", "green", "%s", combinedMsg)
+}
+
+// PrintErr 方法用于将传入的参数以红色文本形式打印到控制台，并在文本前添加一个表示错误的标志（不带占位符）。
+func (c *ColorLib) PrintErr(msg ...any) {
+	if len(msg) == 0 {
+		// 如果没有传入任何参数，直接返回空字符串或默认消息
+		c.PMsg("err", "red", "%s", "")
+		return
+	}
+
+	// 使用 fmt.Sprint 将所有参数拼接成一个字符串
+	combinedMsg := fmt.Sprint(msg...)
+	c.PMsg("err", "red", "%s", combinedMsg)
+}
+
+// PrintWarn 方法用于将传入的参数以黄色文本形式打印到控制台，并在文本前添加一个表示警告的标志（不带占位符）。
+func (c *ColorLib) PrintWarn(msg ...any) {
+	if len(msg) == 0 {
+		// 如果没有传入任何参数，直接返回空字符串或默认消息
+		c.PMsg("warn", "yellow", "%s", "")
+		return
+	}
+
+	// 使用 fmt.Sprint 将所有参数拼接成一个字符串
+	combinedMsg := fmt.Sprint(msg...)
+	c.PMsg("warn", "yellow", "%s", combinedMsg)
+}
+
+// PrintInf 方法用于将传入的参数以蓝色文本形式打印到控制台，并在文本前添加一个表示信息的标志（不带占位符）。
+func (c *ColorLib) PrintInf(msg ...any) {
+	if len(msg) == 0 {
+		// 如果没有传入任何参数，直接返回空字符串或默认消息
+		c.PMsg("inf", "blue", "%s", "")
+		return
+	}
+
+	// 使用 fmt.Sprint 将 msg 中的所有元素拼接成一个字符串
+	combinedMsg := fmt.Sprint(msg...)
+	c.PMsg("inf", "blue", "%s", combinedMsg)
+}
+
+// PrintDbg 方法用于将传入的参数以紫色文本形式打印到控制台，并在文本前添加一个表示调试的标志（不带占位符）。
+func (c *ColorLib) PrintDbg(msg ...any) {
+	if len(msg) == 0 {
+		// 如果没有传入任何参数，直接返回空字符串或默认消息
+		c.PMsg("dbg", "purple", "%s", "")
+		return
+	}
+
+	// 使用 fmt.Sprint 将 msg 中的所有元素拼接成一个字符串
+	combinedMsg := fmt.Sprint(msg...)
+	c.PMsg("dbg", "purple", "%s", combinedMsg)
+}
+
+// PrintOkf 方法用于将传入的参数以绿色文本形式打印到控制台，并在文本前添加一个表示成功的标志（带占位符）。
+func (c *ColorLib) PrintOkf(format string, a ...any) {
+	// 调用 PMsg 方法，传入格式化后的字符串
+	c.PMsg("ok", "green", format, a...)
+}
+
+// PrintErrf 方法用于将传入的参数以红色文本形式打印到控制台，并在文本前添加一个表示错误的标志（带占位符）。
+func (c *ColorLib) PrintErrf(format string, a ...any) {
+	// 调用 PMsg 方法，传入格式化后的字符串
+	c.PMsg("err", "red", format, a...)
+}
+
+// PrintWarnf 方法用于将传入的参数以黄色文本形式打印到控制台，并在文本前添加一个表示警告的标志（带占位符）。
+func (c *ColorLib) PrintWarnf(format string, a ...any) {
+	// 调用 PMsg 方法，传入格式化后的字符串
+	c.PMsg("warn", "yellow", format, a...)
+}
+
+// PrintInff 方法用于将传入的参数以蓝色文本形式打印到控制台，并在文本前添加一个表示信息的标志（带占位符）。
+func (c *ColorLib) PrintInff(format string, a ...any) {
+	// 调用 PMsg 方法，传入格式化后的字符串
+	c.PMsg("inf", "blue", format, a...)
+}
+
+// PrintDbgf 方法用于将传入的参数以紫色文本形式打印到控制台，并在文本前添加一个表示调试的标志（带占位符）。
+func (c *ColorLib) PrintDbgf(format string, a ...any) {
+	// 调用 PMsg 方法，传入格式化后的字符串
+	c.PMsg("dbg", "purple", format, a...)
 }

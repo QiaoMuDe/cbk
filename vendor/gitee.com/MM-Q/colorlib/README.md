@@ -13,7 +13,7 @@
 
 以下是库中定义的颜色及其对应的 ANSI 颜色代码：
 
-`PS`:带l开头的为亮色!
+`PS`:带`l`开头的为亮色!
 
 | 颜色名称 | ANSI 颜色代码 |
 | -------- | ------------- |
@@ -45,6 +45,11 @@
 | warning  | [Warning] |
 | info     | [Info]    |
 | debug    | [Debug]   |
+| ok       | ok:       |
+| err      | err:      |
+| warn     | warn:     |
+| inf      | info:     |
+| dbg      | dbg:      |
 
 ## 内置的函数
 
@@ -81,6 +86,11 @@
 | `Lpurple(msg ...any)`      | 打印亮紫色信息到控制台（不带占位符） |
 | `Lcyan(msg ...any)`        | 打印亮青色信息到控制台（不带占位符） |
 | `Lwhite(msg ...any)`       | 打印亮白色信息到控制台（不带占位符） |
+| `PrintDbg(msg...any)`      | 打印调试信息到控制台（不带占位符）   |
+| `PrintInf(msg...any)`      | 打印信息到控制台（不带占位符）       |
+| `PrintWarn(msg...any)`     | 打印警告信息到控制台（不带占位符）   |
+| `PrintErr(msg...any)`      | 打印错误信息到控制台（不带占位符）   |
+| `PrintOk(msg...any)`       | 打印成功信息到控制台（不带占位符）   |
 
 ### 终端打印（支持占位符）
 
@@ -107,6 +117,11 @@
 | `Lpurplef(format string, a ...any)`      | 打印亮紫色信息到控制台（带占位符） |
 | `Lcyanf(format string, a ...any)`        | 打印亮青色信息到控制台（带占位符） |
 | `Lwhitef(format string, a ...any)`       | 打印亮白色信息到控制台（带占位符） |
+| `PrintDbgf(format string, a...any)`      | 打印调试信息到控制台（带占位符）   |
+| `PrintInff(format string, a...any)`      | 打印信息到控制台（带占位符）       |
+| `PrintWarnf(format string, a...any)`     | 打印警告信息到控制台（带占位符）   |
+| `PrintErrf(format string, a...any)`      | 打印错误信息到控制台（带占位符）   |
+| `PrintOkf(format string, a...any)`       | 打印成功信息到控制台（带占位符）   |
 
 ### 返回构造字符串（不支持占位符）
 
