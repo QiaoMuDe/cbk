@@ -54,11 +54,12 @@ var (
 	runID  = runCmd.Int("id", 0, "任务ID")
 
 	// 子命令：add
-	addCmd    = flag.NewFlagSet("add", flag.ExitOnError)
-	addName   = addCmd.String("n", "", "任务名")
-	addTarget = addCmd.String("t", "", "目标目录")
-	addBackup = addCmd.String("b", "", "备份目录(指定任务存放的父目录路径)")
-	addKeep   = addCmd.Int("k", 3, "保留数量")
+	addCmd           = flag.NewFlagSet("add", flag.ExitOnError)
+	addName          = addCmd.String("n", "", "任务名")
+	addTarget        = addCmd.String("t", "", "目标目录路径")
+	addBackup        = addCmd.String("b", "", "备份存放路径(默认: 用户主目录/.cbk/[项目名]/")
+	addKeep          = addCmd.Int("k", 3, "保留数量")
+	addBackupDirName = addCmd.String("bn", "", "备份目录名(默认: 目标目录名)")
 
 	// 子命令：delete
 	deleteCmd  = flag.NewFlagSet("delete", flag.ExitOnError)
@@ -260,6 +261,13 @@ func addCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("目标目录不能为空")
 	}
 
+	// 检查备份目录名是否非法字符
+	if *addBackupDirName != "" {
+		if tools.ContainsSpecialChars(*addBackupDirName) {
+			return fmt.Errorf("备份目录名含非法字符, 请重试")
+		}
+	}
+
 	// 检查目标目录或文件是否存在
 	if _, err := tools.CheckPath(*addTarget); err != nil {
 		return fmt.Errorf("目标目录或文件不存在: %w", err)
@@ -281,10 +289,16 @@ func addCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("获取目标目录绝对路径失败: %w", err)
 	}
 
-	// 获取目标目录的basename作为存放备份的目录名
-	bakDirName := filepath.Base(AbsAddTarget)
+	// 如果备份目录名为空, 则获取目标目录的basename作为存放备份的目录名
+	var bakDirName string
+	if *addBackupDirName == "" {
+		bakDirName = filepath.Base(AbsAddTarget)
+	} else {
+		// 使用指定的备份目录名
+		bakDirName = *addBackupDirName
+	}
 
-	// 如果备份目录为空, 则使用默认值
+	// 如果备份目录为空, 则使用默认值路径，格式为: /home/username/.cbk/data/xxx
 	if *addBackup == "" {
 		// 获取用户主目录
 		tempHome, err := os.UserHomeDir()
