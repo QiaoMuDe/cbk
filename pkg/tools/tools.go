@@ -548,6 +548,9 @@ func createZip(zipFilePath string, sourceDir string) error {
 			return fmt.Errorf("获取相对路径失败: %w", err)
 		}
 
+		// 替换路径分隔符为正斜杠（ZIP 文件格式要求）
+		headerName = filepath.ToSlash(headerName)
+
 		// 创建 ZIP 文件头
 		header, err := zip.FileInfoHeader(info)
 		if err != nil {
