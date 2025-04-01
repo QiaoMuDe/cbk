@@ -574,6 +574,9 @@ func runCmdMain(db *sqlx.DB) error {
 		}
 	}
 
+	// 打印提示信息
+	fmt.Printf("开始运行备份任务 %s...\n", task.TaskName)
+
 	// 构建备份文件名
 	backupTime := time.Now().Format("20060102150405")
 	backupFileNamePrefix := fmt.Sprintf("%s_%s", task.TaskName, backupTime)
@@ -652,6 +655,9 @@ func runCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("删除多余的备份文件失败: %w", err)
 		}
 	}
+
+	// 打印成功信息
+	fmt.Println("备份成功")
 
 	return nil
 }
