@@ -637,7 +637,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 打印成功信息
-	CL.PrintOkf(`备份成功!`)
+	CL.PrintOk(`备份成功!`)
 
 	return nil
 }
