@@ -599,14 +599,14 @@ func unzip(zipFilePath string, targetDir string) error {
 	}
 
 	// 获取 ZIP 文件的总大小
-	totalSize := int64(0)
+	var totalSize uint64
 	for _, file := range zipReader.File {
-		totalSize += int64(file.UncompressedSize64)
+		totalSize += file.UncompressedSize64
 	}
 
 	// 创建进度条
 	bar := progressbar.DefaultBytes(
-		totalSize,
+		int64(totalSize), // progressbar 库要求传入 int64 类型
 		"正在解压",
 	)
 
@@ -637,10 +637,23 @@ func unzip(zipFilePath string, targetDir string) error {
 		}
 		defer zipFileReader.Close()
 
-		// 将文件内容复制到目标文件
-		if _, err := io.Copy(io.MultiWriter(fileWriter, bar), zipFileReader); err != nil {
-			return fmt.Errorf("复制文件内容失败: %w", err)
+		// 使用缓冲区分块读取和写入文件内容
+		buffer := make([]byte, 1024*1024) // 1MB 缓冲区
+		for {
+			n, err := zipFileReader.Read(buffer)
+			if err != nil && err != io.EOF {
+				return fmt.Errorf("读取 ZIP 文件内容失败: %w", err)
+			}
+			if n == 0 {
+				break
+			}
+			if _, err := fileWriter.Write(buffer[:n]); err != nil {
+				return fmt.Errorf("写入文件内容失败: %w", err)
+			}
+			// 更新进度条
+			bar.Add64(int64(n)) // progressbar 库要求传入 int64 类型
 		}
 	}
+
 	return nil
 }
