@@ -8,7 +8,6 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,10 +24,30 @@ var CL = colorlib.NewColorLib()
 //go:embed help/help.txt
 var HelpText string
 
+// 定义存放表格样式的MAP
+var (
+	TableStyle = map[string]table.Style{
+		"default":     table.StyleDefault,       // 默认样式
+		"bold":        table.StyleBold,          // 加粗样式
+		"colorbright": table.StyleColoredBright, // 亮色样式
+		"colordark":   table.StyleColoredDark,   // 暗色样式
+		"double":      table.StyleDouble,        // 双边框样式
+		"light":       table.StyleLight,         // 浅色样式
+		"rounded":     table.StyleRounded,       // 圆角样式
+		"bd":          table.StyleBold,          // 加粗样式
+		"cb":          table.StyleColoredBright, // 亮色样式
+		"cd":          table.StyleColoredDark,   // 暗色样式
+		"de":          table.StyleDouble,        // 双边框样式
+		"lt":          table.StyleLight,         // 浅色样式
+		"ro":          table.StyleRounded,       // 圆角样式
+	}
+)
+
 // 定义子命令及其参数
 var (
 	// 子命令：list
-	listCmd = flag.NewFlagSet("list", flag.ExitOnError)
+	listCmd        = flag.NewFlagSet("list", flag.ExitOnError)
+	listTableStyle = listCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
 
 	// 子命令：run
 	runCmd = flag.NewFlagSet("run", flag.ExitOnError)
@@ -54,21 +73,22 @@ var (
 	editKeep = editCmd.Int("k", 3, "保留数量")
 
 	// 子命令：log
-	logCmd   = flag.NewFlagSet("log", flag.ExitOnError)
-	logLimit = logCmd.Int("l", 10, "显示的行数")
-	logView  = logCmd.Bool("v", false, "是否显示详细日志")
+	logCmd        = flag.NewFlagSet("log", flag.ExitOnError)
+	logLimit      = logCmd.Int("l", 10, "显示的行数")
+	logView       = logCmd.Bool("v", false, "是否显示详细日志")
+	logTableStyle = logCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
 
 	// 子命令：show
-	showCmd  = flag.NewFlagSet("show", flag.ExitOnError)
-	showID   = showCmd.Int("id", 0, "任务ID")
-	showView = showCmd.Bool("v", false, "是否显示详细信息")
+	showCmd        = flag.NewFlagSet("show", flag.ExitOnError)
+	showID         = showCmd.Int("id", 0, "任务ID")
+	showView       = showCmd.Bool("v", false, "是否显示详细信息")
+	showTableStyle = showCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
 
 	// 子命令：unpack
 	unpackCmd       = flag.NewFlagSet("unpack", flag.ExitOnError)
 	unpackID        = unpackCmd.Int("id", 0, "任务ID")
 	unpackVersionID = unpackCmd.String("v", "", "指定解压的版本ID")
 	unpackOutput    = unpackCmd.String("o", ".", "指定输出的路径(默认当前目录)")
-	//unpackForce     = unpackCmd.Bool("f", false, "表示强制覆盖")
 
 	// 子命令：version
 	versionCmd = flag.NewFlagSet("version", flag.ExitOnError)
@@ -429,25 +449,33 @@ func listCmdMain(db *sqlx.DB) error {
 
 	// 创建表格
 	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout) // 使用标准输出作为输出目标
+
+	// 设置表格样式
+	if style, ok := TableStyle[*listTableStyle]; ok {
+		t.SetStyle(style)
+	} else {
+		// 定义样式列表
+		var styleList []string
+		for k := range TableStyle {
+			styleList = append(styleList, k)
+		}
+		return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *listTableStyle, styleList)
+	}
+
+	// 使用标准输出作为输出目标
+	t.SetOutputMirror(os.Stdout)
+
 	// 设置表头
 	t.AppendHeader(table.Row{"ID", "任务名", "保留数量", "目标目录", "备份目录"})
 
 	// 设置列配置
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Name: "ID", Align: text.AlignCenter},
-		{Name: "任务名", Align: text.AlignLeft},
-		{Name: "保留数量", Align: text.AlignCenter},
-		{Name: "目标目录", Align: text.AlignLeft},
-		{Name: "备份目录", Align: text.AlignLeft},
+		{Name: "ID", Align: text.AlignCenter, WidthMaxEnforcer: text.WrapHard},
+		{Name: "任务名", Align: text.AlignLeft, WidthMaxEnforcer: text.WrapHard},
+		{Name: "保留数量", Align: text.AlignCenter, WidthMaxEnforcer: text.WrapHard},
+		{Name: "目标目录", Align: text.AlignLeft, WidthMaxEnforcer: text.WrapHard},
+		{Name: "备份目录", Align: text.AlignLeft, WidthMaxEnforcer: text.WrapHard},
 	})
-	// t.SetColumnConfigs([]table.ColumnConfig{
-	// 	{Name: "ID", WidthMax: 4},
-	// 	{Name: "任务名", WidthMax: 10},
-	// 	{Name: "保留数量", WidthMax: 10},
-	// 	{Name: "目标目录", WidthMax: 30},
-	// 	{Name: "备份目录", WidthMax: 30},
-	// })
 
 	// 添加数据行
 	for _, task := range tasks {
@@ -702,7 +730,23 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 	if *logView {
 		// 创建表格
 		t := table.NewWriter()
-		t.SetOutputMirror(log.Writer())
+
+		// 设置表格输出到标准输出
+		t.SetOutputMirror(os.Stdout)
+
+		// 设置表格样式
+		if style, ok := TableStyle[*logTableStyle]; ok {
+			t.SetStyle(style)
+		} else {
+			// 定义样式列表
+			var styleList []string
+			for k := range TableStyle {
+				styleList = append(styleList, k)
+			}
+			return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *logTableStyle, styleList)
+		}
+
+		// 添加表头
 		t.AppendHeader(table.Row{"备份时间", "版本ID", "任务ID", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希"})
 
 		// 遍历查询结果，将数据添加到表格中
@@ -729,17 +773,16 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 		}
 
 		// 设置表格样式
-		//t.SetStyle(table.StyleLight)
 		t.SetColumnConfigs([]table.ColumnConfig{
-			{Name: "版本ID", WidthMax: 10},
-			{Name: "任务ID", WidthMax: 10},
-			{Name: "备份时间", WidthMax: 20},
-			{Name: "任务名", WidthMax: 20},
-			{Name: "备份状态", WidthMax: 10},
-			{Name: "备份文件名", WidthMax: 20},
-			{Name: "备份文件大小", WidthMax: 10},
-			{Name: "备份存放目录", WidthMax: 30},
-			{Name: "版本哈希", WidthMax: 20},
+			{Name: "版本ID", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+			{Name: "任务ID", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份时间", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+			{Name: "任务名", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份状态", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份文件名", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份文件大小", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份存放目录", WidthMax: 30, WidthMaxEnforcer: text.WrapHard},
+			{Name: "版本哈希", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
 		})
 		t.SetColumnConfigs([]table.ColumnConfig{
 			{Name: "版本ID", Align: text.AlignCenter},
@@ -762,7 +805,23 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 	// 默认为简略格式
 	// 创建表格
 	t := table.NewWriter()
-	t.SetOutputMirror(log.Writer())
+
+	// 设置表格输出到标准输出
+	t.SetOutputMirror(os.Stdout)
+
+	// 设置表格样式
+	if style, ok := TableStyle[*logTableStyle]; ok {
+		t.SetStyle(style)
+	} else {
+		// 定义样式列表
+		var styleList []string
+		for k := range TableStyle {
+			styleList = append(styleList, k)
+		}
+		return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *logTableStyle, styleList)
+	}
+
+	// 添加表头
 	t.AppendHeader(table.Row{"备份时间", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录"})
 
 	// 遍历查询结果，将数据添加到表格中
@@ -786,14 +845,13 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 	}
 
 	// 设置表格样式
-	//t.SetStyle(table.StyleLight)
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Name: "备份时间", WidthMax: 20},
-		{Name: "任务名", WidthMax: 20},
-		{Name: "备份状态", WidthMax: 10},
-		{Name: "备份文件名", WidthMax: 20},
-		{Name: "备份文件大小", WidthMax: 10},
-		{Name: "备份存放目录", WidthMax: 30},
+		{Name: "备份时间", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+		{Name: "任务名", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+		{Name: "备份状态", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+		{Name: "备份文件名", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+		{Name: "备份文件大小", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+		{Name: "备份存放目录", WidthMax: 30, WidthMaxEnforcer: text.WrapHard},
 	})
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Name: "备份时间", Align: text.AlignLeft},
@@ -844,7 +902,23 @@ func showCmdMain(db *sqlx.DB) error {
 	if *showView {
 		// 创建表格
 		t := table.NewWriter()
-		t.SetOutputMirror(log.Writer())
+
+		// 设置表格输出到标准输出
+		t.SetOutputMirror(os.Stdout)
+
+		// 设置表格样式
+		if style, ok := TableStyle[*showTableStyle]; ok {
+			t.SetStyle(style)
+		} else {
+			// 定义样式列表
+			var styleList []string
+			for k := range TableStyle {
+				styleList = append(styleList, k)
+			}
+			return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *showTableStyle, styleList)
+		}
+
+		// 添加表头
 		t.AppendHeader(table.Row{"备份时间", "版本ID", "任务ID", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份文件路径", "版本哈希"})
 
 		// 将查询结果添加到表格
@@ -871,17 +945,16 @@ func showCmdMain(db *sqlx.DB) error {
 		}
 
 		// 设置表格样式
-		//t.SetStyle(table.StyleLight)
 		t.SetColumnConfigs([]table.ColumnConfig{
-			{Name: "版本ID", WidthMax: 10},
-			{Name: "任务ID", WidthMax: 10},
-			{Name: "备份时间", WidthMax: 20},
-			{Name: "任务名", WidthMax: 20},
-			{Name: "备份状态", WidthMax: 10},
-			{Name: "备份文件名", WidthMax: 20},
-			{Name: "备份文件大小", WidthMax: 10},
-			{Name: "备份存放目录", WidthMax: 30},
-			{Name: "版本哈希", WidthMax: 20},
+			{Name: "版本ID", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+			{Name: "任务ID", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份时间", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+			{Name: "任务名", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份状态", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份文件名", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份文件大小", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+			{Name: "备份存放目录", WidthMax: 30, WidthMaxEnforcer: text.WrapHard},
+			{Name: "版本哈希", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
 		})
 		t.SetColumnConfigs([]table.ColumnConfig{
 			{Name: "版本ID", Align: text.AlignCenter},
@@ -904,7 +977,20 @@ func showCmdMain(db *sqlx.DB) error {
 	// 默认为简略格式
 	// 创建表格
 	t := table.NewWriter()
-	t.SetOutputMirror(log.Writer())
+	// 设置表格输出到标准输出
+	t.SetOutputMirror(os.Stdout)
+	// 设置表格样式
+	if style, ok := TableStyle[*showTableStyle]; ok {
+		t.SetStyle(style)
+	} else {
+		// 定义样式列表
+		var styleList []string
+		for k := range TableStyle {
+			styleList = append(styleList, k)
+		}
+		return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *showTableStyle, styleList)
+	}
+	// 添加表头
 	t.AppendHeader(table.Row{"备份时间", "版本ID", "任务ID", "任务名"})
 
 	// 将查询结果添加到表格
@@ -926,12 +1012,11 @@ func showCmdMain(db *sqlx.DB) error {
 	}
 
 	// 设置表格样式
-	//t.SetStyle(table.StyleLight)
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Name: "版本ID", WidthMax: 10},
-		{Name: "任务ID", WidthMax: 10},
-		{Name: "备份时间", WidthMax: 20},
-		{Name: "任务名", WidthMax: 20},
+		{Name: "版本ID", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+		{Name: "任务ID", WidthMax: 10, WidthMaxEnforcer: text.WrapHard},
+		{Name: "备份时间", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
+		{Name: "任务名", WidthMax: 20, WidthMaxEnforcer: text.WrapHard},
 	})
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Name: "版本ID", Align: text.AlignCenter},

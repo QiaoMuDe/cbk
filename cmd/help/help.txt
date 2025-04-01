@@ -23,7 +23,7 @@ cbk - 命令行备份任务管理工具
 子命令参数：
 
   list:
-    无参数，列出所有备份任务的基本信息。
+    -ts, --ts <string>     指定表格样式（可选，默认为“default”）。
 
   run:
     -id, --id <int>           指定要运行的备份任务ID（必填）。
@@ -47,10 +47,12 @@ cbk - 命令行备份任务管理工具
   log:
     -l, --limit <int>         指定显示的日志行数（默认为10）。
     -v, --v                   显示更详细的日志信息（可选）。
+    -ts, --ts <string>     指定表格样式（可选，默认为“default”）。
 
   show:
     -id, --id <int>           指定要显示详细信息的备份任务ID（必填）。
     -v, --v                   显示更详细的任务信息（可选）。
+    -ts, --ts <string>     指定表格样式（可选，默认为“default”）。
 
   unpack:
     -id, --id <int>           指定要解压的备份文件ID（必填）。
@@ -62,6 +64,21 @@ cbk - 命令行备份任务管理工具
 
   help:
     无参数，显示帮助信息。
+
+支持的表格样式：
+  "default":      默认样式
+	"bold":         加粗样式
+	"colorbright":  亮色样式
+	"colordark":    暗色样式
+	"double":       双边框样式
+	"light":        浅色样式
+	"rounded":      圆角样式
+	"bd":           加粗样式(缩写版)
+	"cb":           亮色样式(缩写版)
+	"cd":           暗色样式(缩写版)
+	"de":           双边框样式(缩写版)
+	"lt":           浅色样式(缩写版)
+	"ro":           圆角样式(缩写版)
 
 示例：
   cbk list
@@ -85,7 +102,11 @@ cbk - 命令行备份任务管理工具
   cbk show -id 4
     显示ID为4的备份任务的详细信息。
 
+  cbk log -l 20 -v -ts "light"
+    查看最近20行备份任务的详细日志，并使用“light”样式显示。
+
   cbk unpack -id 5 -o "/data/unpacked" -v 151nmgd1
+    解压ID为5的备份文件，解压后的目录为“/data/unpacked”，解压的版本ID为151nmgd1。
 
   cbk version
     显示当前版本信息。
