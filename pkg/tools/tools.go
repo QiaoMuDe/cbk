@@ -231,6 +231,19 @@ func GetFileMD5Last8(filePath string) (string, error) {
 	}
 	defer file.Close()
 
+	// 获取文件大小
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return "", fmt.Errorf("获取文件大小时出错: %w", err)
+	}
+	fileSize := fileInfo.Size()
+
+	// 创建进度条
+	bar := progressbar.DefaultBytes(
+		fileSize,
+		"正在计算MD5",
+	)
+
 	// 创建 MD5 哈希对象
 	hash := md5.New()
 
@@ -245,6 +258,7 @@ func GetFileMD5Last8(filePath string) (string, error) {
 			break // 文件读取完成
 		}
 		hash.Write(buffer[:n]) // 将读取的内容写入哈希对象
+		bar.Add64(int64(n))    // 更新进度条
 	}
 
 	// 获取完整的 MD5 哈希值
@@ -252,6 +266,9 @@ func GetFileMD5Last8(filePath string) (string, error) {
 
 	// 将哈希值转换为十六进制字符串
 	hashStr := fmt.Sprintf("%x", sum)
+
+	// 确保进度条完成
+	bar.Finish()
 
 	// 返回哈希值的后 8 位
 	return hashStr[len(hashStr)-8:], nil

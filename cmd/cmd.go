@@ -11,13 +11,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"gitee.com/MM-Q/colorlib"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/jmoiron/sqlx"
-	"github.com/schollz/progressbar/v3"
 )
 
 // 定义全局颜色渲染器
@@ -548,12 +548,6 @@ func runCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("运行备份任务时, 必须指定任务ID")
 	}
 
-	// 创建进度条
-	bar := progressbar.DefaultBytes(
-		int64(6), // progressbar 库要求传入 int64 类型
-		"执行备份任务",
-	)
-
 	// 获取任务信息
 	var task struct {
 		TaskName        string `db:"task_name"`        // 任务名
@@ -567,8 +561,6 @@ func runCmdMain(db *sqlx.DB) error {
 	} else if err != nil {
 		return fmt.Errorf("获取任务信息失败: %w", err)
 	}
-	// 更新进度条
-	bar.Add64(int64(1)) // progressbar 库要求传入 int64 类型
 
 	// 检查目标目录或文件是否存在
 	if _, err := tools.CheckPath(task.TargetDirectory); err != nil {
@@ -581,8 +573,6 @@ func runCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("备份目录创建失败: %w", err)
 		}
 	}
-	// 更新进度条
-	bar.Add64(int64(1)) // progressbar 库要求传入 int64 类型
 
 	// 构建备份文件名
 	backupTime := time.Now().Format("20060102150405")
@@ -596,14 +586,32 @@ func runCmdMain(db *sqlx.DB) error {
 	targetName := filepath.Base(task.TargetDirectory)                               // 获取目标目录的最后一个部分
 	backupFileNamePath := filepath.Join(task.BackupDirectory, backupFileNamePrefix) // 获取构建的备份文件路径
 
-	// 执行备份任务
-	zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath)
-	if err != nil {
-		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "0", "-"); err != nil {
-			return fmt.Errorf("插入备份记录失败: %w", err)
+	// 定义一个同步等待锁
+	var w sync.WaitGroup
+	w.Add(1)
+
+	// 定义接收错误的变量
+	var zipPath string
+	var backupErr error
+
+	// 启动一个协程执行备份任务
+	go func() {
+		defer w.Done()
+		// 执行备份任务
+		zipPath, backupErr = tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath)
+		if backupErr != nil {
+			errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+			if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "0", "-"); err != nil {
+				backupErr = fmt.Errorf("插入备份记录失败: %w", backupErr)
+			}
+			backupErr = fmt.Errorf("备份任务失败: %w", backupErr)
 		}
-		return fmt.Errorf("备份任务失败: %w", err)
+	}()
+
+	w.Wait()
+	// 检查协程是否发生错误
+	if backupErr != nil {
+		return backupErr
 	}
 
 	// 获取备份文件的后8位MD5哈希值
@@ -615,8 +623,6 @@ func runCmdMain(db *sqlx.DB) error {
 		}
 		return fmt.Errorf("获取备份文件MD5失败: %w", err)
 	}
-	// 更新进度条
-	bar.Add64(int64(1)) // progressbar 库要求传入 int64 类型
 
 	// 获取备份文件的大小
 	backupFileSize, err := tools.HumanReadableSize(zipPath)
@@ -627,16 +633,12 @@ func runCmdMain(db *sqlx.DB) error {
 		}
 		return fmt.Errorf("获取备份文件大小失败: %w", err)
 	}
-	// 更新进度条
-	bar.Add64(int64(1)) // progressbar 库要求传入 int64 类型
 
 	// 插入备份记录
 	insertSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?,?)"
 	if _, err := db.Exec(insertSql, versionID, *runID, backupTime, task.TaskName, "true", filepath.Base(zipPath), backupFileSize, task.BackupDirectory, "1", backupFileMD5); err != nil {
 		return fmt.Errorf("插入备份记录失败: %w", err)
 	}
-	// 更新进度条
-	bar.Add64(int64(1)) // progressbar 库要求传入 int64 类型
 
 	// 获取备份目录下的以指定扩展名的文件列表
 	zipFiles, err := tools.GetZipFiles(task.BackupDirectory, ".zip")
@@ -650,11 +652,6 @@ func runCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("删除多余的备份文件失败: %w", err)
 		}
 	}
-	// 更新进度条
-	bar.Add64(int64(1)) // progressbar 库要求传入 int64 类型
-
-	// 打印备份信息
-	//CL.Greenf("备份完成: %s", task.TaskName)
 
 	return nil
 }
