@@ -1,0 +1,26 @@
+用法：cbk list [-ts <表格样式>] [-no-table | -nt]
+
+描述：
+  列出所有备份任务的概览信息。可以通过选项自定义表格样式或禁用表格输出。
+
+参数：
+  -ts <表格样式>       可选。指定表格的显示样式。可选值包括：
+                        default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro。
+                        默认值为 "default"。
+  -no-table            可选。如果指定，禁用表格输出，以纯文本形式显示任务信息。
+  -nt                  可选。与 -no-table 功能相同，简写形式。
+
+示例：
+  cbk list
+  列出所有备份任务的概览信息，以默认表格样式显示。
+
+  cbk list -ts bold
+  列出所有备份任务的概览信息，以 "bold" 表格样式显示。
+
+  cbk list -no-table
+  列出所有备份任务的概览信息，以纯文本形式显示，不使用表格。
+
+注意：
+  1. 如果未指定表格样式（-ts），默认使用 "default" 样式。
+  2. 如果同时指定了 -no-table 和 -nt，以最后一个为准。
+  3. 表格样式的选择应根据实际显示需求进行调整。

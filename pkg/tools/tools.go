@@ -469,8 +469,8 @@ func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath
 		return "", fmt.Errorf("切换到目标目录时出错: %w", err)
 	}
 
-	// 调用内部createZip函数执行实际压缩操作
-	if err := createZip(zipFilePath, targetName); err != nil {
+	// 调用CreateZip函数执行实际压缩操作
+	if err := CreateZip(zipFilePath, targetName); err != nil {
 		return "", fmt.Errorf("压缩文件时出错: %w", err)
 	}
 
@@ -500,15 +500,32 @@ func UncompressFilesByOS(zipDir, zipFileName, outputPath string) (string, error)
 	}
 
 	// 调用解压函数
-	if err := unzip(zipFilePath, outputPath); err != nil {
+	if err := Unzip(zipFilePath, outputPath); err != nil {
 		return "", fmt.Errorf("解压文件时出错: %w", err)
 	}
 
 	return outputPath, nil
 }
 
-// createZip 函数用于创建ZIP压缩文件
-func createZip(zipFilePath string, sourceDir string) error {
+// CreateZip 函数用于创建ZIP压缩文件
+func CreateZip(zipFilePath string, sourceDir string) error {
+	// 检查zipFilePath是否为绝对路径，如果不是，将其转换为绝对路径
+	if !filepath.IsAbs(zipFilePath) {
+		absPath, err := filepath.Abs(zipFilePath)
+		if err != nil {
+			return fmt.Errorf("转换zipFilePath为绝对路径失败: %w", err)
+		}
+		zipFilePath = absPath
+	}
+	// 检查sourceDir是否为绝对路径，如果不是，将其转换为绝对路径
+	if !filepath.IsAbs(sourceDir) {
+		absPath, err := filepath.Abs(sourceDir)
+		if err != nil {
+			return fmt.Errorf("转换sourceDir为绝对路径失败: %w", err)
+		}
+		sourceDir = absPath
+	}
+
 	// 创建 ZIP 文件
 	zipFile, err := os.Create(zipFilePath)
 	if err != nil {
@@ -615,7 +632,7 @@ func createZip(zipFilePath string, sourceDir string) error {
 }
 
 // 解压缩 ZIP 文件到指定目录
-func unzip(zipFilePath string, targetDir string) error {
+func Unzip(zipFilePath string, targetDir string) error {
 	// 打开 ZIP 文件
 	zipReader, err := zip.OpenReader(zipFilePath)
 	if err != nil {

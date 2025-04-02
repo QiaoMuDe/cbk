@@ -1,0 +1,12 @@
+用法：cbk zip <zipfile> <target_path>
+
+描述：
+  将指定的目标路径打包为 ZIP 压缩文件。
+
+参数：
+  <zipfile>       要创建的 ZIP 压缩文件的名称。
+  <target_path>   要打包的目录或文件路径。
+
+示例：
+  cbk zip backup.zip /home/user/documents
+  该命令会将 "/home/user/documents" 目录下的所有文件和子目录打包为名为 "backup.zip" 的 ZIP 压缩文件。

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gitee.com/MM-Q/colorlib"
@@ -42,6 +43,36 @@ var (
 		"ro":          table.StyleRounded,       // 圆角样式
 	}
 )
+
+//go:embed help/help_list.txt
+var HelpListText string
+
+//go:embed help/help_run.txt
+var HelpRunText string
+
+//go:embed help/help_add.txt
+var HelpAddText string
+
+//go:embed help/help_delete.txt
+var HelpDeleteText string
+
+//go:embed help/help_edit.txt
+var HelpEditText string
+
+//go:embed help/help_log.txt
+var HelpLogText string
+
+//go:embed help/help_show.txt
+var HelpShowText string
+
+//go:embed help/help_zip.txt
+var HelpZipText string
+
+//go:embed help/help_unzip.txt
+var HelpUnzipText string
+
+//go:embed help/help_unpack.txt
+var HelpUnpackText string
 
 // 定义子命令及其参数
 var (
@@ -97,12 +128,81 @@ var (
 	unpackVersionID = unpackCmd.String("v", "", "指定解压的版本ID")
 	unpackOutput    = unpackCmd.String("o", ".", "指定输出的路径(默认当前目录)")
 
+	// 子命令：zip
+	zipCmd = flag.NewFlagSet("zip", flag.ExitOnError)
+
+	// 子命令：unzip
+	unzipCmd    = flag.NewFlagSet("unzip", flag.ExitOnError)
+	unzipOutput = unzipCmd.String("o", ".", "指定输出的路径(默认当前目录)")
+
 	// 子命令：version
 	versionCmd = flag.NewFlagSet("version", flag.ExitOnError)
 
 	// 子命令：help
 	helpCmd = flag.NewFlagSet("help", flag.ExitOnError)
 )
+
+func init() {
+	// 初始化list命令的帮助信息
+	listCmd.Usage = func() {
+		fmt.Println(HelpListText)
+		os.Exit(0)
+	}
+
+	// 初始化run命令的帮助信息
+	runCmd.Usage = func() {
+		fmt.Println(HelpRunText)
+		os.Exit(0)
+	}
+
+	// 初始化add命令的帮助信息
+	addCmd.Usage = func() {
+		fmt.Println(HelpAddText)
+		os.Exit(0)
+	}
+
+	// 初始化delete命令的帮助信息
+	deleteCmd.Usage = func() {
+		fmt.Println(HelpDeleteText)
+		os.Exit(0)
+	}
+
+	// 初始化edit命令的帮助信息
+	editCmd.Usage = func() {
+		fmt.Println(HelpEditText)
+		os.Exit(0)
+	}
+
+	// 初始化log命令的帮助信息
+	logCmd.Usage = func() {
+		fmt.Println(HelpLogText)
+		os.Exit(0)
+	}
+
+	// 初始化show命令的帮助信息
+	showCmd.Usage = func() {
+		fmt.Println(HelpShowText)
+		os.Exit(0)
+	}
+
+	// 初始化unpack命令的帮助信息
+	unpackCmd.Usage = func() {
+		fmt.Println(HelpUnpackText)
+		os.Exit(0)
+	}
+
+	// 初始化zip命令的帮助信息
+	zipCmd.Usage = func() {
+		fmt.Println(HelpZipText)
+		os.Exit(0)
+	}
+
+	// 初始化unzip命令的帮助信息
+	unzipCmd.Usage = func() {
+		fmt.Println(HelpUnzipText)
+		os.Exit(0)
+	}
+}
 
 // 定义子命令的执行逻辑
 func ExecuteCommands(db *sqlx.DB, args []string) error {
@@ -257,6 +357,46 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("解压备份任务失败: %v", err)
 		}
 		return nil
+	case "zip":
+		// 解析zip命令的参数
+		if err := zipCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析zip命令参数失败: %v", err)
+		}
+		// 执行zip命令的逻辑
+		if err := zipCmdMain(zipCmd.Args()); err != nil {
+			return fmt.Errorf("打包ZIP文件失败: %v", err)
+		}
+		return nil
+	case "z":
+		// 解析zip命令的参数
+		if err := zipCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析zip命令参数失败: %v", err)
+		}
+		// 执行zip命令的逻辑
+		if err := zipCmdMain(zipCmd.Args()); err != nil {
+			return fmt.Errorf("打包ZIP文件失败: %v", err)
+		}
+		return nil
+	case "unzip":
+		// 解析unzip命令的参数
+		if err := unzipCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析unzip命令参数失败: %v", err)
+		}
+		// 执行unzip命令的逻辑
+		if err := unzipCmdMain(unzipCmd.Args()); err != nil {
+			return fmt.Errorf("解压ZIP文件失败: %v", err)
+		}
+		return nil
+	case "uz":
+		// 解析unzip命令的参数
+		if err := unzipCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析unzip命令参数失败: %v", err)
+		}
+		// 执行unzip命令的逻辑
+		if err := unzipCmdMain(unzipCmd.Args()); err != nil {
+			return fmt.Errorf("解压ZIP文件失败: %v", err)
+		}
+		return nil
 	// 打印版本信息
 	case "version":
 		// 解析version命令的参数
@@ -277,8 +417,16 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		if err := helpCmd.Parse(args[1:]); err != nil {
 			return fmt.Errorf("解析help命令参数失败: %v", err)
 		}
+
+		// 如果没有指定子命令，则打印帮助信息
+		if len(helpCmd.Args()) == 0 {
+			return fmt.Errorf("请指定要查看帮助的命令, 例如: 'cbk help 指定命令'")
+		}
+
 		// 执行help命令的逻辑
-		fmt.Println(HelpText)
+		if err := helpCmdMain(helpCmd.Args()[0]); err != nil {
+			return fmt.Errorf("打印帮助信息失败: %v", err)
+		}
 		return nil
 	// 未知命令
 	default:
@@ -1248,4 +1396,144 @@ func unpackCmdMain(db *sqlx.DB) error {
 		return nil
 	}
 
+}
+
+// 打印帮助信息
+func helpCmdMain(cmd string) error {
+	// 检查是否指定了命令
+	if cmd == "" {
+		return fmt.Errorf("请指定要查看帮助的命令, 例如: 'cbk help 指定命令'")
+	}
+
+	// 根据命令打印帮助信息
+	switch cmd {
+	case "list":
+		fmt.Println(HelpListText)
+		return nil
+	case "add":
+		fmt.Println(HelpAddText)
+		return nil
+	case "unpack":
+		fmt.Println(HelpUnpackText)
+		return nil
+	case "show":
+		fmt.Println(HelpShowText)
+		return nil
+	case "log":
+		fmt.Println(HelpLogText)
+		return nil
+	case "run":
+		fmt.Println(HelpRunText)
+		return nil
+	case "delete":
+		fmt.Println(HelpDeleteText)
+		return nil
+	case "zip":
+		fmt.Println(HelpZipText)
+		return nil
+	case "unzip":
+		fmt.Println(HelpUnzipText)
+		return nil
+	case "edit":
+		fmt.Println(HelpEditText)
+		return nil
+	default:
+		return fmt.Errorf("未知命令: %s", cmd)
+	}
+}
+
+// zipCmdMain 压缩指定目录下的文件
+func zipCmdMain(args []string) error {
+	// 检查是否指定了ZIP文件和目录
+	if len(args) < 2 {
+		return fmt.Errorf("请指定要压缩的ZIP文件和目录, 例如: 'cbk zip /path/to/zipfile.zip /path/to/directory'")
+	}
+
+	// 获取指定的ZIP文件
+	zipFilePath := args[0]
+
+	// 获取指定的目录路径
+	dirPath := args[1]
+
+	// 基本格式检查
+	if !strings.HasSuffix(zipFilePath, ".zip") {
+		return fmt.Errorf("ZIP文件路径必须以.zip结尾: %s", zipFilePath)
+	}
+
+	// 清理路径并获取绝对路径
+	zipFilePath = filepath.Clean(zipFilePath)
+	if tempPath, err := filepath.Abs(zipFilePath); err != nil {
+		return fmt.Errorf("获取ZIP文件绝对路径失败: %w", err)
+	} else {
+		zipFilePath = tempPath
+	}
+
+	// 清理路径并获取绝对路径
+	dirPath = filepath.Clean(dirPath)
+	if tempPath, err := filepath.Abs(dirPath); err != nil {
+		return fmt.Errorf("获取目录绝对路径失败: %w", err)
+	} else {
+		dirPath = tempPath
+	}
+
+	// 检查指定的ZIP文件路径是否存在
+	if _, err := tools.CheckPath(zipFilePath); err == nil {
+		return fmt.Errorf("指定的ZIP文件已存在: %s", zipFilePath)
+	}
+
+	// 检查指定的目录路径是否存在
+	if _, err := tools.CheckPath(dirPath); err != nil {
+		return fmt.Errorf("指定的目录路径不存在: %s", dirPath)
+	}
+
+	// 创建ZIP文件
+	if err := tools.CreateZip(zipFilePath, dirPath); err != nil {
+		return fmt.Errorf("创建ZIP文件失败: %w", err)
+	}
+
+	return nil
+}
+
+// unzipCmdMain 解压指定的ZIP文件
+func unzipCmdMain(args []string) error {
+	// 检查是否指定了ZIP文件
+	if len(args) < 1 {
+		return fmt.Errorf("请指定要解压的ZIP文件, 例如: 'cbk unzip /path/to/zipfile.zip'")
+	}
+
+	// 获取指定的ZIP文件
+	zipFilePath := args[0]
+
+	// 检查ZIP文件路径是否以.zip结尾
+	if !strings.HasSuffix(zipFilePath, ".zip") {
+		return fmt.Errorf("ZIP文件路径必须以.zip结尾: %s", zipFilePath)
+	}
+
+	// 检查指定的ZIP文件路径是否存在
+	if _, err := tools.CheckPath(zipFilePath); err != nil {
+		return fmt.Errorf("指定的ZIP文件路径不存在: %s", zipFilePath)
+	}
+
+	// 检查输出目录是否存在
+	if _, err := tools.CheckPath(*unzipOutput); err != nil {
+		return fmt.Errorf("指定的输出目录不存在: %s", *unzipOutput)
+	}
+
+	// 以点号分隔文件名，获取文件名
+	tempName := strings.Split(filepath.Base(zipFilePath), ".")[0]
+
+	// 构建解压后的目录路径
+	unzipOutputDir := filepath.Join(*unzipOutput, tempName)
+
+	// 检查解压后的目录路径是否存在
+	if _, err := tools.CheckPath(unzipOutputDir); err == nil {
+		return fmt.Errorf("该路径疑似和解压后的ZIP文件冲突: %s, 请先重命名或移动该路径", unzipOutputDir)
+	}
+
+	// 解压ZIP文件
+	if err := tools.Unzip(zipFilePath, *unzipOutput); err != nil {
+		return fmt.Errorf("解压ZIP文件失败: %w", err)
+	}
+
+	return nil
 }
