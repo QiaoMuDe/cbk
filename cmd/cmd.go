@@ -46,8 +46,10 @@ var (
 // 定义子命令及其参数
 var (
 	// 子命令：list
-	listCmd        = flag.NewFlagSet("list", flag.ExitOnError)
-	listTableStyle = listCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
+	listCmd          = flag.NewFlagSet("list", flag.ExitOnError)
+	listTableStyle   = listCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
+	listNoTable      = listCmd.Bool("no-table", false, "是否禁用表格输出")
+	listNoTableShort = listCmd.Bool("nt", false, "是否禁用表格输出")
 
 	// 子命令：run
 	runCmd = flag.NewFlagSet("run", flag.ExitOnError)
@@ -74,16 +76,20 @@ var (
 	editKeep = editCmd.Int("k", 3, "保留数量")
 
 	// 子命令：log
-	logCmd        = flag.NewFlagSet("log", flag.ExitOnError)
-	logLimit      = logCmd.Int("l", 10, "显示的行数")
-	logView       = logCmd.Bool("v", false, "是否显示详细日志")
-	logTableStyle = logCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
+	logCmd          = flag.NewFlagSet("log", flag.ExitOnError)
+	logLimit        = logCmd.Int("l", 10, "显示的行数")
+	logView         = logCmd.Bool("v", false, "是否显示详细日志")
+	logTableStyle   = logCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
+	logNoTable      = logCmd.Bool("no-table", false, "是否禁用表格输出")
+	logNoTableShort = logCmd.Bool("nt", false, "是否禁用表格输出")
 
 	// 子命令：show
-	showCmd        = flag.NewFlagSet("show", flag.ExitOnError)
-	showID         = showCmd.Int("id", 0, "任务ID")
-	showView       = showCmd.Bool("v", false, "是否显示详细信息")
-	showTableStyle = showCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
+	showCmd          = flag.NewFlagSet("show", flag.ExitOnError)
+	showID           = showCmd.Int("id", 0, "任务ID")
+	showView         = showCmd.Bool("v", false, "是否显示详细信息")
+	showTableStyle   = showCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
+	showNoTable      = showCmd.Bool("no-table", false, "是否禁用表格输出")
+	showNoTableShort = showCmd.Bool("nt", false, "是否禁用表格输出")
 
 	// 子命令：unpack
 	unpackCmd       = flag.NewFlagSet("unpack", flag.ExitOnError)
@@ -103,7 +109,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 	switch args[0] {
 	case "list":
 		// 解析list命令的参数
-		listCmd.Parse(args[1:])
+		if err := listCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析list命令参数失败: %v", err)
+		}
 		// 执行list命令的逻辑
 		if err := listCmdMain(db); err != nil {
 			return fmt.Errorf("列出项目列表失败: %v", err)
@@ -111,7 +119,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "l":
 		// 解析list命令的参数
-		listCmd.Parse(args[1:])
+		if err := listCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析list命令参数失败: %v", err)
+		}
 		// 执行list命令的逻辑
 		if err := listCmdMain(db); err != nil {
 			return fmt.Errorf("列出项目列表失败: %v", err)
@@ -119,7 +129,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "run":
 		// 解析run命令的参数
-		runCmd.Parse(args[1:])
+		if err := runCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析run命令参数失败: %v", err)
+		}
 		// 执行run命令的逻辑
 		if err := runCmdMain(db); err != nil {
 			return fmt.Errorf("执行备份任务失败: %v", err)
@@ -127,7 +139,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "r":
 		// 解析run命令的参数
-		runCmd.Parse(args[1:])
+		if err := runCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析run命令参数失败: %v", err)
+		}
 		// 执行run命令的逻辑
 		if err := runCmdMain(db); err != nil {
 			return fmt.Errorf("执行备份任务失败: %v", err)
@@ -135,7 +149,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "add":
 		// 解析add命令的参数
-		addCmd.Parse(args[1:])
+		if err := addCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析add命令参数失败: %v", err)
+		}
 		// 执行add命令的逻辑
 		if err := addCmdMain(db); err != nil {
 			return fmt.Errorf("添加项目失败: %v", err)
@@ -143,7 +159,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "a":
 		// 解析add命令的参数
-		addCmd.Parse(args[1:])
+		if err := addCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析add命令参数失败: %v", err)
+		}
 		// 执行add命令的逻辑
 		if err := addCmdMain(db); err != nil {
 			return fmt.Errorf("添加项目失败: %v", err)
@@ -151,7 +169,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "delete":
 		// 解析delete命令的参数
-		deleteCmd.Parse(args[1:])
+		if err := deleteCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析delete命令参数失败: %v", err)
+		}
 		// 执行delete命令的逻辑
 		if err := deleteCmdMain(db); err != nil {
 			return fmt.Errorf("删除项目失败: %v", err)
@@ -159,7 +179,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "d":
 		// 解析delete命令的参数
-		deleteCmd.Parse(args[1:])
+		if err := deleteCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析delete命令参数失败: %v", err)
+		}
 		// 执行delete命令的逻辑
 		if err := deleteCmdMain(db); err != nil {
 			return fmt.Errorf("删除项目失败: %v", err)
@@ -167,7 +189,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "edit":
 		// 解析edit命令的参数
-		editCmd.Parse(args[1:])
+		if err := editCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析edit命令参数失败: %v", err)
+		}
 		// 执行edit命令的逻辑
 		if err := editCmdMain(db); err != nil {
 			return fmt.Errorf("编辑项目失败: %v", err)
@@ -175,7 +199,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "e":
 		// 解析edit命令的参数
-		editCmd.Parse(args[1:])
+		if err := editCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析edit命令参数失败: %v", err)
+		}
 		// 执行edit命令的逻辑
 		if err := editCmdMain(db); err != nil {
 			return fmt.Errorf("编辑项目失败: %v", err)
@@ -183,7 +209,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "log":
 		// 解析log命令的参数
-		logCmd.Parse(args[1:])
+		if err := logCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析log命令参数失败: %v", err)
+		}
 		// 执行log命令的逻辑
 		if err := logCmdMain(db, 1, *logLimit); err != nil {
 			return fmt.Errorf("查看日志失败: %v", err)
@@ -191,7 +219,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "show":
 		// 解析show命令的参数
-		showCmd.Parse(args[1:])
+		if err := showCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析show命令参数失败: %v", err)
+		}
 		// 执行show命令的逻辑
 		if err := showCmdMain(db); err != nil {
 			return fmt.Errorf("查看指定备份任务的信息失败: %v", err)
@@ -199,7 +229,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "s":
 		// 解析show命令的参数
-		showCmd.Parse(args[1:])
+		if err := showCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析show命令参数失败: %v", err)
+		}
 		// 执行show命令的逻辑
 		if err := showCmdMain(db); err != nil {
 			return fmt.Errorf("查看指定备份任务的信息失败: %v", err)
@@ -207,7 +239,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "unpack":
 		// 解析unpack命令的参数
-		unpackCmd.Parse(args[1:])
+		if err := unpackCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析unpack命令参数失败: %v", err)
+		}
 		// 执行unpack命令的逻辑
 		if err := unpackCmdMain(db); err != nil {
 			return fmt.Errorf("解压备份任务失败: %v", err)
@@ -215,7 +249,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	case "u":
 		// 解析unpack命令的参数
-		unpackCmd.Parse(args[1:])
+		if err := unpackCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析unpack命令参数失败: %v", err)
+		}
 		// 执行unpack命令的逻辑
 		if err := unpackCmdMain(db); err != nil {
 			return fmt.Errorf("解压备份任务失败: %v", err)
@@ -223,7 +259,11 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		return nil
 	// 打印版本信息
 	case "version":
-		versionCmd.Parse(args[1:])
+		// 解析version命令的参数
+		if err := versionCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析version命令参数失败: %v", err)
+		}
+		// 执行version命令的逻辑
 		v := version.Get()
 		if versionInfo, err := v.SprintVersion("text"); err != nil {
 			return fmt.Errorf("获取版本信息失败: %v", err)
@@ -234,7 +274,9 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 	// 打印帮助信息
 	case "help":
 		// 解析help命令的参数
-		helpCmd.Parse(args[1:])
+		if err := helpCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析help命令参数失败: %v", err)
+		}
 		// 执行help命令的逻辑
 		fmt.Println(HelpText)
 		return nil
@@ -459,6 +501,18 @@ func listCmdMain(db *sqlx.DB) error {
 
 	if err := db.Select(&tasks, querySql); err != nil {
 		return fmt.Errorf("查询任务失败: %w", err)
+	}
+
+	// 禁用表格的输出
+	if *listNoTable || *listNoTableShort {
+		// 打印任务列表
+		fmt.Printf("%-30s %-10s %-15s %-30s %-30s\n",
+			"任务名", "任务ID", "保留数量", "目标目录", "备份目录")
+		for _, task := range tasks {
+			fmt.Printf("%-30s %-10d %-15d %-30s %-30s\n", task.TaskName, task.TaskID, task.RetentionCount, task.TargetDirectory, task.BackupDirectory)
+		}
+
+		return nil
 	}
 
 	// 创建表格
@@ -742,6 +796,23 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 
 	// 选择完整格式
 	if *logView {
+		// 禁用表格的输出
+		if *logNoTable || *logNoTableShort {
+			// 打印备份记录
+			fmt.Printf("%-25s%-18s%-15s%-20s%-10s%-40s%-30s%-25s%-10s\n", "备份时间", "版本ID", "任务ID", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希")
+			for _, record := range records {
+				// 将时间戳转换为时间对象并格式化为易读格式
+				timestamp, err := time.Parse("20060102150405", record.Timestamp)
+				if err != nil {
+					return fmt.Errorf("解析时间戳失败: %w", err)
+				}
+				formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
+				fmt.Printf("%-25s%-25s%-15d%-20s%-10s%-40s%-30s%-30s%-10s\n", formattedTimestamp, record.VersionID, record.TaskID, record.TaskName, record.BackupStatus, record.BackupFileName, record.BackupSize, record.BackupPath, record.VersionHash)
+			}
+
+			return nil
+		}
+
 		// 创建表格
 		t := table.NewWriter()
 
@@ -812,6 +883,23 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 
 		// 打印表格
 		t.Render()
+
+		return nil
+	}
+
+	// 禁用表格的输出
+	if *logNoTable || *logNoTableShort {
+		// 打印备份记录
+		fmt.Printf("%-25s%-20s%-10s%-40s%-30s%-25s\n", "备份时间", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录")
+		for _, record := range records {
+			// 将时间戳转换为时间对象并格式化为易读格式
+			timestamp, err := time.Parse("20060102150405", record.Timestamp)
+			if err != nil {
+				return fmt.Errorf("解析时间戳失败: %w", err)
+			}
+			formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
+			fmt.Printf("%-25s%-20s%-10s%-40s%-30s%-30s\n", formattedTimestamp, record.TaskName, record.BackupStatus, record.BackupFileName, record.BackupSize, record.BackupPath)
+		}
 
 		return nil
 	}
@@ -914,6 +1002,23 @@ func showCmdMain(db *sqlx.DB) error {
 
 	// 检查是否需要选择完整格式
 	if *showView {
+		// 禁用表格的输出
+		if *showNoTable || *showNoTableShort {
+			// 打印备份记录
+			fmt.Printf("%-25s%-18s%-15s%-20s%-10s%-40s%-30s%-25s%-10s\n", "备份时间", "版本ID", "任务ID", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希")
+			for _, record := range records {
+				// 将时间戳转换为时间对象并格式化为易读格式
+				timestamp, err := time.Parse("20060102150405", record.Timestamp)
+				if err != nil {
+					return fmt.Errorf("解析时间戳失败: %w", err)
+				}
+				formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
+				fmt.Printf("%-25s%-25s%-15d%-20s%-10s%-40s%-30s%-30s%-10s\n", formattedTimestamp, record.VersionID, record.TaskID, record.TaskName, record.BackupStatus, record.BackupFileName, record.BackupSize, record.BackupPath, record.VersionHash)
+			}
+
+			return nil
+		}
+
 		// 创建表格
 		t := table.NewWriter()
 
@@ -986,6 +1091,24 @@ func showCmdMain(db *sqlx.DB) error {
 		t.Render()
 
 		return nil
+	}
+
+	// 禁用表格的输出
+	if *showNoTable || *showNoTableShort {
+		// 打印备份记录
+		fmt.Printf("%-25s%-18s%-15s%-20s\n", "备份时间", "版本ID", "任务ID", "任务名")
+		for _, record := range records {
+			// 将时间戳转换为时间对象并格式化为易读格式
+			timestamp, err := time.Parse("20060102150405", record.Timestamp)
+			if err != nil {
+				return fmt.Errorf("解析时间戳失败: %w", err)
+			}
+			formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
+			fmt.Printf("%-25s%-25s%-15d%-20s\n", formattedTimestamp, record.VersionID, record.TaskID, record.TaskName)
+		}
+
+		return nil
+
 	}
 
 	// 默认为简略格式

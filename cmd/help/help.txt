@@ -24,6 +24,8 @@ cbk - 命令行备份任务管理工具
 
   list:
     -ts, --ts <string>       指定表格样式（可选，默认为“default”）。
+    -nt, --nt                禁用表格输出（可选）。
+    -no-table, --no-table    禁用表格输出（可选）。
 
   run:
     -id, --id <int>          指定要运行的备份任务ID（必填）。
@@ -49,11 +51,15 @@ cbk - 命令行备份任务管理工具
     -l, --l <int>             指定显示的日志行数（默认为10）。
     -v, --v                   显示更详细的日志信息（可选）。
     -ts, --ts <string>        指定表格样式（可选，默认为“default”）。
+    -nt, --nt                禁用表格输出（可选）。
+    -no-table, --no-table    禁用表格输出（可选）。
 
   show:
     -id, --id <int>           指定要显示详细信息的备份任务ID（必填）。
     -v, --v                   显示更详细的任务信息（可选）。
     -ts, --ts <string>        指定表格样式（可选，默认为“default”）。
+    -nt, --nt                禁用表格输出（可选）。
+    -no-table, --no-table    禁用表格输出（可选）。
 
   unpack:
     -id, --id <int>           指定要解压的备份文件ID（必填）。

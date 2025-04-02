@@ -260,7 +260,10 @@ func GetFileMD5Last8(filePath string) (string, error) {
 			break // 文件读取完成
 		}
 		hash.Write(buffer[:n]) // 将读取的内容写入哈希对象
-		bar.Add64(int64(n))    // 更新进度条
+		// 更新进度条// progressbar 库要求传入 int64 类型
+		if err := bar.Add64(int64(n)); err != nil {
+			return "", fmt.Errorf("更新进度条失败: %w", err)
+		}
 	}
 
 	// 获取完整的 MD5 哈希值
@@ -270,7 +273,9 @@ func GetFileMD5Last8(filePath string) (string, error) {
 	hashStr := fmt.Sprintf("%x", sum)
 
 	// 确保进度条完成
-	bar.Finish()
+	if err := bar.Finish(); err != nil {
+		return "", fmt.Errorf("进度条完成失败: %w", err)
+	}
 
 	// 返回哈希值的后 8 位
 	return hashStr[len(hashStr)-8:], nil
@@ -593,7 +598,10 @@ func createZip(zipFilePath string, sourceDir string) error {
 			if err != nil {
 				return fmt.Errorf("写入 ZIP 文件失败: %w", err)
 			}
-			bar.Add64(int64(n)) // 更新进度条
+			// 更新进度条// progressbar 库要求传入 int64 类型
+			if err := bar.Add64(int64(n)); err != nil {
+				return fmt.Errorf("更新进度条失败: %w", err)
+			}
 		}
 
 		return nil
@@ -672,8 +680,10 @@ func unzip(zipFilePath string, targetDir string) error {
 			if _, err := fileWriter.Write(buffer[:n]); err != nil {
 				return fmt.Errorf("写入文件内容失败: %w", err)
 			}
-			// 更新进度条
-			bar.Add64(int64(n)) // progressbar 库要求传入 int64 类型
+			// 更新进度条// progressbar 库要求传入 int64 类型
+			if err := bar.Add64(int64(n)); err != nil {
+				return fmt.Errorf("更新进度条失败: %w", err)
+			}
 		}
 	}
 
