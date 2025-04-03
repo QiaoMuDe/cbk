@@ -129,11 +129,14 @@ var (
 	unpackOutput    = unpackCmd.String("o", ".", "指定输出的路径(默认当前目录)")
 
 	// 子命令：zip
-	zipCmd = flag.NewFlagSet("zip", flag.ExitOnError)
+	zipCmd    = flag.NewFlagSet("zip", flag.ExitOnError)
+	zipOutput = zipCmd.String("o", "未命名.zip", "指定输出的压缩包名(默认: 未命名.zip)")
+	zipTarget = zipCmd.String("t", "", "指定要打包的目标路径")
 
 	// 子命令：unzip
-	unzipCmd    = flag.NewFlagSet("unzip", flag.ExitOnError)
-	unzipOutput = unzipCmd.String("o", ".", "指定输出的路径(默认当前目录)")
+	unzipCmd       = flag.NewFlagSet("unzip", flag.ExitOnError)
+	unzipFile      = unzipCmd.String("f", "", "指定要解压的压缩文件名")
+	unzipOutputDir = unzipCmd.String("d", ".", "指定解压的目标路径。如果未指定，则解压到当前目录")
 
 	// 子命令：version
 	versionCmd = flag.NewFlagSet("version", flag.ExitOnError)
@@ -363,7 +366,7 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("解析zip命令参数失败: %v", err)
 		}
 		// 执行zip命令的逻辑
-		if err := zipCmdMain(zipCmd.Args()); err != nil {
+		if err := zipCmdMain(); err != nil {
 			return fmt.Errorf("打包ZIP文件失败: %v", err)
 		}
 		return nil
@@ -373,7 +376,7 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("解析zip命令参数失败: %v", err)
 		}
 		// 执行zip命令的逻辑
-		if err := zipCmdMain(zipCmd.Args()); err != nil {
+		if err := zipCmdMain(); err != nil {
 			return fmt.Errorf("打包ZIP文件失败: %v", err)
 		}
 		return nil
@@ -383,7 +386,7 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("解析unzip命令参数失败: %v", err)
 		}
 		// 执行unzip命令的逻辑
-		if err := unzipCmdMain(unzipCmd.Args()); err != nil {
+		if err := unzipCmdMain(); err != nil {
 			return fmt.Errorf("解压ZIP文件失败: %v", err)
 		}
 		return nil
@@ -393,7 +396,7 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("解析unzip命令参数失败: %v", err)
 		}
 		// 执行unzip命令的逻辑
-		if err := unzipCmdMain(unzipCmd.Args()); err != nil {
+		if err := unzipCmdMain(); err != nil {
 			return fmt.Errorf("解压ZIP文件失败: %v", err)
 		}
 		return nil
@@ -1443,51 +1446,40 @@ func helpCmdMain(cmd string) error {
 }
 
 // zipCmdMain 压缩指定目录下的文件
-func zipCmdMain(args []string) error {
-	// 检查是否指定了ZIP文件和目录
-	if len(args) < 2 {
-		return fmt.Errorf("请指定要压缩的ZIP文件和目录, 例如: 'cbk zip /path/to/zipfile.zip /path/to/directory'")
-	}
-
-	// 获取指定的ZIP文件
-	zipFilePath := args[0]
-
-	// 获取指定的目录路径
-	dirPath := args[1]
-
+func zipCmdMain() error {
 	// 基本格式检查
-	if !strings.HasSuffix(zipFilePath, ".zip") {
-		return fmt.Errorf("ZIP文件路径必须以.zip结尾: %s", zipFilePath)
+	if !strings.HasSuffix(*zipOutput, ".zip") {
+		return fmt.Errorf("ZIP文件路径必须以.zip结尾: %s", *zipOutput)
 	}
 
 	// 清理路径并获取绝对路径
-	zipFilePath = filepath.Clean(zipFilePath)
-	if tempPath, err := filepath.Abs(zipFilePath); err != nil {
+	*zipOutput = filepath.Clean(*zipOutput)
+	if tempPath, err := filepath.Abs(*zipOutput); err != nil {
 		return fmt.Errorf("获取ZIP文件绝对路径失败: %w", err)
 	} else {
-		zipFilePath = tempPath
+		*zipOutput = tempPath
 	}
 
 	// 清理路径并获取绝对路径
-	dirPath = filepath.Clean(dirPath)
-	if tempPath, err := filepath.Abs(dirPath); err != nil {
+	*zipTarget = filepath.Clean(*zipTarget)
+	if tempPath, err := filepath.Abs(*zipTarget); err != nil {
 		return fmt.Errorf("获取目录绝对路径失败: %w", err)
 	} else {
-		dirPath = tempPath
+		*zipTarget = tempPath
 	}
 
 	// 检查指定的ZIP文件路径是否存在
-	if _, err := tools.CheckPath(zipFilePath); err == nil {
-		return fmt.Errorf("指定的ZIP文件已存在: %s", zipFilePath)
+	if _, err := tools.CheckPath(*zipOutput); err == nil {
+		return fmt.Errorf("指定输出的压缩包名已存在: %s", *zipOutput)
 	}
 
 	// 检查指定的目录路径是否存在
-	if _, err := tools.CheckPath(dirPath); err != nil {
-		return fmt.Errorf("指定的目录路径不存在: %s", dirPath)
+	if _, err := tools.CheckPath(*zipTarget); err != nil {
+		return fmt.Errorf("指定的目录路径不存在: %s", *zipTarget)
 	}
 
 	// 创建ZIP文件
-	if err := tools.CreateZip(zipFilePath, dirPath); err != nil {
+	if err := tools.CreateZip(*zipOutput, *zipTarget); err != nil {
 		return fmt.Errorf("创建ZIP文件失败: %w", err)
 	}
 
@@ -1495,43 +1487,35 @@ func zipCmdMain(args []string) error {
 }
 
 // unzipCmdMain 解压指定的ZIP文件
-func unzipCmdMain(args []string) error {
-	// 检查是否指定了ZIP文件
-	if len(args) < 1 {
-		return fmt.Errorf("请指定要解压的ZIP文件, 例如: 'cbk unzip /path/to/zipfile.zip'")
-	}
-
-	// 获取指定的ZIP文件
-	zipFilePath := args[0]
-
+func unzipCmdMain() error {
 	// 检查ZIP文件路径是否以.zip结尾
-	if !strings.HasSuffix(zipFilePath, ".zip") {
-		return fmt.Errorf("ZIP文件路径必须以.zip结尾: %s", zipFilePath)
+	if !strings.HasSuffix(*unzipFile, ".zip") {
+		return fmt.Errorf("ZIP文件路径必须以.zip结尾: %s", *unzipFile)
 	}
 
 	// 检查指定的ZIP文件路径是否存在
-	if _, err := tools.CheckPath(zipFilePath); err != nil {
-		return fmt.Errorf("指定的ZIP文件路径不存在: %s", zipFilePath)
+	if _, err := tools.CheckPath(*unzipFile); err != nil {
+		return fmt.Errorf("指定的ZIP文件路径不存在: %s", *unzipFile)
 	}
 
 	// 检查输出目录是否存在
-	if _, err := tools.CheckPath(*unzipOutput); err != nil {
-		return fmt.Errorf("指定的输出目录不存在: %s", *unzipOutput)
+	if _, err := tools.CheckPath(*unzipOutputDir); err != nil {
+		return fmt.Errorf("指定的输出目录不存在: %s", *unzipOutputDir)
 	}
 
 	// 以点号分隔文件名，获取文件名
-	tempName := strings.Split(filepath.Base(zipFilePath), ".")[0]
+	tempName := strings.Split(filepath.Base(*unzipFile), ".")[0]
 
 	// 构建解压后的目录路径
-	unzipOutputDir := filepath.Join(*unzipOutput, tempName)
+	unzipOutputDirJoin := filepath.Join(*unzipOutputDir, tempName)
 
 	// 检查解压后的目录路径是否存在
-	if _, err := tools.CheckPath(unzipOutputDir); err == nil {
-		return fmt.Errorf("该路径疑似和解压后的ZIP文件冲突: %s, 请先重命名或移动该路径", unzipOutputDir)
+	if _, err := tools.CheckPath(unzipOutputDirJoin); err == nil {
+		return fmt.Errorf("该路径疑似和解压后的ZIP文件冲突: %s, 请先重命名或移动该路径", unzipOutputDirJoin)
 	}
 
 	// 解压ZIP文件
-	if err := tools.Unzip(zipFilePath, *unzipOutput); err != nil {
+	if err := tools.Unzip(*unzipFile, *unzipOutputDir); err != nil {
 		return fmt.Errorf("解压ZIP文件失败: %w", err)
 	}
 
