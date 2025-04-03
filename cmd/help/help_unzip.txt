@@ -1,15 +1,15 @@
-用法：cbk unzip <zipfile> [target_path]
+用法：cbk unzip -f <压缩包名> [-d <目标路径>]
 
 描述：
-  解压 ZIP 压缩文件的内容到指定的目标路径，如果未指定目标路径，则默认解压到当前目录。
+  解压指定的压缩文件到目标路径。如果未指定目标路径，则解压到当前目录。
 
 参数：
-  <zipfile>       要解压的 ZIP 压缩文件。
-  -o, --o <path>  指定解压的目标路径(默认为当前目录'.')
+  -f <压缩包名>       必需。指定要解压的压缩文件名。
+  -d <目标路径>       可选。指定解压的目标路径。如果未指定，则解压到当前目录。
 
 示例：
-  cbk unzip backup.zip
-  该命令会将 "backup.zip" 的内容解压到当前工作目录。
+  cbk unzip -f backup.zip
+  将 "backup.zip" 解压到当前目录。
 
-  cbk unzip -o /home/user/recovered backup.zip
-  该命令会将 "backup.zip" 的内容解压到 "/home/user/recovered" 目录。
+  cbk unzip -f backup.zip -d /home/user/recovered
+  将 "backup.zip" 解压到 "/home/user/recovered" 目录。
