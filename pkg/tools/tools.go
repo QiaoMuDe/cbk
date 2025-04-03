@@ -93,7 +93,7 @@ func CheckPath(path string) (PathInfo, error) {
 		if os.IsNotExist(err) {
 			// 如果路径不存在, 则直接返回
 			info.Exists = false
-			return info, fmt.Errorf("路径 '%s' 不存在，请检查路径是否正确: %s", path, err)
+			return info, fmt.Errorf("路径 '%s' 不存在，请检查路径是否正确: %s", path, os.ErrNotExist)
 		} else {
 			return info, fmt.Errorf("无法访问路径 '%s': %s", path, err)
 		}
@@ -734,4 +734,17 @@ func ContainsSpecialChars(s string) bool {
 
 	// 如果没有找到任何特殊或危险字符，返回false
 	return false
+}
+
+// SanitizePath 清理并获取路径的绝对路径
+// 参数：path - 需要清理的路径指针
+// 返回：error - 如果发生错误，返回错误信息；否则返回 nil
+func SanitizePath(path *string) error {
+	*path = filepath.Clean(*path)
+	absPath, err := filepath.Abs(*path)
+	if err != nil {
+		return fmt.Errorf("获取路径绝对路径失败: %w", err)
+	}
+	*path = absPath
+	return nil
 }

@@ -51,6 +51,16 @@ if [ $? -ne 0 ]; then
 fi
 rm -f /tmp/vet.log
 
+# 通过 gofmt 格式化代码
+echo "正在格式化代码..."
+gofmt -w . > /tmp/gofmt.log 2>&1
+if [ $? -ne 0 ]; then
+    echo "错误: 代码格式化失败，请修复代码中的错误。"
+    cat /tmp/gofmt.log
+    exit 1
+fi
+rm -f /tmp/gofmt.log
+
 # 获取 Git 版本信息
 echo "正在获取 Git 版本信息..."
 # 获取 Git 版本

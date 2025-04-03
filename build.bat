@@ -48,6 +48,15 @@ if %errorlevel% neq 0 (
 )
 del vet.log
 
+REM :: 通过 gofmt 格式化代码
+gofmt -w . > fmt.log 2>&1
+if %errorlevel% neq 0 (
+    echo 错误: gofmt 格式化失败，请查看以下问题：
+    type fmt.log
+    del fmt.log 
+)
+del fmt.log
+
 :: 获取 Git 版本信息
 echo 正在获取 Git 版本信息...
 

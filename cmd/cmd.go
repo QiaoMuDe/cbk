@@ -45,34 +45,34 @@ var (
 )
 
 //go:embed help/help_list.txt
-var HelpListText string
+var HelpListText string // 定义子命令：list的帮助文本
 
 //go:embed help/help_run.txt
-var HelpRunText string
+var HelpRunText string // 定义子命令：run的帮助文本
 
 //go:embed help/help_add.txt
-var HelpAddText string
+var HelpAddText string // 定义子命令：add的帮助文本
 
 //go:embed help/help_delete.txt
-var HelpDeleteText string
+var HelpDeleteText string // 定义子命令：delete的帮助文本
 
 //go:embed help/help_edit.txt
-var HelpEditText string
+var HelpEditText string // 定义子命令：edit的帮助文本
 
 //go:embed help/help_log.txt
-var HelpLogText string
+var HelpLogText string // 定义子命令：log的帮助文本
 
 //go:embed help/help_show.txt
-var HelpShowText string
+var HelpShowText string // 定义子命令：show的帮助文本
 
 //go:embed help/help_zip.txt
-var HelpZipText string
+var HelpZipText string // 定义子命令：zip的帮助文本
 
 //go:embed help/help_unzip.txt
-var HelpUnzipText string
+var HelpUnzipText string // 定义子命令：unzip的帮助文本
 
 //go:embed help/help_unpack.txt
-var HelpUnpackText string
+var HelpUnpackText string // 定义子命令：unpack的帮助文本
 
 // 定义子命令及其参数
 var (
@@ -1447,30 +1447,42 @@ func helpCmdMain(cmd string) error {
 
 // zipCmdMain 压缩指定目录下的文件
 func zipCmdMain() error {
+	// 检查是否指定了ZIP文件名
+	if *zipOutput == "" {
+		return fmt.Errorf("打包ZIP文件时, 必须指定ZIP文件名")
+	}
+
+	// 检查是否指定了目录路径
+	if *zipTarget == "" {
+		return fmt.Errorf("打包ZIP文件时, 必须指定目录路径")
+	}
+
 	// 基本格式检查
 	if !strings.HasSuffix(*zipOutput, ".zip") {
 		return fmt.Errorf("ZIP文件路径必须以.zip结尾: %s", *zipOutput)
 	}
 
 	// 清理路径并获取绝对路径
-	*zipOutput = filepath.Clean(*zipOutput)
-	if tempPath, err := filepath.Abs(*zipOutput); err != nil {
-		return fmt.Errorf("获取ZIP文件绝对路径失败: %w", err)
-	} else {
-		*zipOutput = tempPath
+	if err := tools.SanitizePath(zipOutput); err != nil {
+		return fmt.Errorf("清理路径并获取绝对路径失败: %w", err)
 	}
 
 	// 清理路径并获取绝对路径
-	*zipTarget = filepath.Clean(*zipTarget)
-	if tempPath, err := filepath.Abs(*zipTarget); err != nil {
-		return fmt.Errorf("获取目录绝对路径失败: %w", err)
-	} else {
-		*zipTarget = tempPath
+	if err := tools.SanitizePath(zipTarget); err != nil {
+		return fmt.Errorf("清理路径并获取绝对路径失败: %w", err)
 	}
 
 	// 检查指定的ZIP文件路径是否存在
-	if _, err := tools.CheckPath(*zipOutput); err == nil {
-		return fmt.Errorf("指定输出的压缩包名已存在: %s", *zipOutput)
+	if info, err := tools.CheckPath(*zipOutput); err == nil {
+		// 如果路径存在
+		if info.Exists {
+			// 如果路径存在且是一个文件
+			if info.IsFile {
+				return fmt.Errorf("指定的ZIP文件已存在: %s", *zipOutput)
+			}
+			// 如果路径存在但不是一个文件（例如是一个目录）
+			return fmt.Errorf("指定的路径存在，但不是一个文件: %s", *zipOutput)
+		}
 	}
 
 	// 检查指定的目录路径是否存在
@@ -1488,6 +1500,21 @@ func zipCmdMain() error {
 
 // unzipCmdMain 解压指定的ZIP文件
 func unzipCmdMain() error {
+	// 检查是否指定了ZIP文件路径
+	if *unzipFile == "" {
+		return fmt.Errorf("解压ZIP文件时, 必须指定ZIP文件路径")
+	}
+
+	// 对指定的ZIP文件路径进行清理和获取绝对路径
+	if err := tools.SanitizePath(unzipFile); err != nil {
+		return fmt.Errorf("获取ZIP文件绝对路径失败: %w", err)
+	}
+
+	// 对指定的输出目录进行清理和获取绝对路径
+	if err := tools.SanitizePath(unzipOutputDir); err != nil {
+		return fmt.Errorf("获取输出目录绝对路径失败: %w", err)
+	}
+
 	// 检查ZIP文件路径是否以.zip结尾
 	if !strings.HasSuffix(*unzipFile, ".zip") {
 		return fmt.Errorf("ZIP文件路径必须以.zip结尾: %s", *unzipFile)
@@ -1504,19 +1531,19 @@ func unzipCmdMain() error {
 	}
 
 	// 以点号分隔文件名，获取文件名
-	tempName := strings.Split(filepath.Base(*unzipFile), ".")[0]
+	unzipDirName := strings.Split(filepath.Base(*unzipFile), ".")[0]
 
 	// 构建解压后的目录路径
-	unzipOutputDirJoin := filepath.Join(*unzipOutputDir, tempName)
+	unzipTargetDir := filepath.Join(*unzipOutputDir, unzipDirName)
 
 	// 检查解压后的目录路径是否存在
-	if _, err := tools.CheckPath(unzipOutputDirJoin); err == nil {
-		return fmt.Errorf("该路径疑似和解压后的ZIP文件冲突: %s, 请先重命名或移动该路径", unzipOutputDirJoin)
+	if _, err := tools.CheckPath(unzipTargetDir); err == nil {
+		return fmt.Errorf("该路径疑似和解压后的ZIP文件冲突: %s, 请先重命名或移动该路径", unzipTargetDir)
 	}
 
 	// 解压ZIP文件
 	if err := tools.Unzip(*unzipFile, *unzipOutputDir); err != nil {
-		return fmt.Errorf("解压ZIP文件失败: %w", err)
+		return fmt.Errorf("解压ZIP文件失败: %s", err)
 	}
 
 	return nil
