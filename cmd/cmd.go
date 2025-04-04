@@ -74,6 +74,9 @@ var HelpUnzipText string // 定义子命令：unzip的帮助文本
 //go:embed help/help_unpack.txt
 var HelpUnpackText string // 定义子命令：unpack的帮助文本
 
+//go:embed help/help_clear.txt
+var HelpClearText string // 定义子命令：clear的帮助文本
+
 // 定义子命令及其参数
 var (
 	// 子命令：list
@@ -95,16 +98,18 @@ var (
 	addBackupDirName = addCmd.String("bn", "", "备份目录名(默认: 目标目录名)")
 
 	// 子命令：delete
-	deleteCmd  = flag.NewFlagSet("delete", flag.ExitOnError)
-	deleteID   = deleteCmd.Int("id", 0, "任务ID")
-	deleteName = deleteCmd.String("n", "", "任务名")
-	deleteDirF = deleteCmd.Bool("d", false, "在删除任务时，是否同时删除备份文件。若启用此选项，备份文件将被一同删除")
+	deleteCmd       = flag.NewFlagSet("delete", flag.ExitOnError)
+	deleteID        = deleteCmd.Int("id", 0, "任务ID")
+	deleteName      = deleteCmd.String("n", "", "任务名")
+	deleteDirF      = deleteCmd.Bool("d", false, "在删除任务时，是否同时删除备份文件。若启用此选项，备份文件将被一同删除")
+	deleteVersionID = deleteCmd.String("v", "", "指定要删除的备份版本ID")
 
 	// 子命令：edit
-	editCmd  = flag.NewFlagSet("edit", flag.ExitOnError)
-	editName = editCmd.String("n", "", "任务名")
-	editID   = editCmd.Int("id", 0, "任务ID")
-	editKeep = editCmd.Int("k", 3, "保留数量")
+	editCmd        = flag.NewFlagSet("edit", flag.ExitOnError)
+	editName       = editCmd.String("n", "", "指定新的任务名。如果未指定，则任务名保持不变")
+	editID         = editCmd.Int("id", 0, "指定要编辑的备份任务ID")
+	editKeep       = editCmd.Int("k", 3, "指定备份文件的保留数量。如果未指定，则保留数量保持不变")
+	editNewDirName = editCmd.String("bn", "", "指定新的备份目录名。如果未指定，则备份目录名保持不变")
 
 	// 子命令：log
 	logCmd          = flag.NewFlagSet("log", flag.ExitOnError)
@@ -143,6 +148,10 @@ var (
 
 	// 子命令：help
 	helpCmd = flag.NewFlagSet("help", flag.ExitOnError)
+
+	// 子命令：clear
+	clearCmd     = flag.NewFlagSet("clear", flag.ExitOnError)
+	clearConfirm = clearCmd.Bool("confirm", false, "确认是否执行清空数据操作")
 )
 
 func init() {
@@ -203,6 +212,12 @@ func init() {
 	// 初始化unzip命令的帮助信息
 	unzipCmd.Usage = func() {
 		fmt.Println(HelpUnzipText)
+		os.Exit(0)
+	}
+
+	// 初始化clear命令的帮助信息
+	clearCmd.Usage = func() {
+		fmt.Println(HelpClearText)
 		os.Exit(0)
 	}
 }
@@ -431,6 +446,17 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("打印帮助信息失败: %v", err)
 		}
 		return nil
+	case "clear":
+		// 解析clear命令的参数
+		if err := clearCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析clear命令参数失败: %v", err)
+		}
+
+		// 执行clear命令的逻辑
+		if err := clearCmdMain(db); err != nil {
+			return fmt.Errorf("清空数据库失败: %v", err)
+		}
+		return nil
 	// 未知命令
 	default:
 		return fmt.Errorf("未知命令: %s", args[0])
@@ -546,95 +572,135 @@ func addCmdMain(db *sqlx.DB) error {
 
 // delete命令的执行逻辑
 func deleteCmdMain(db *sqlx.DB) error {
-	// 如果deleteName不为空, 则根据任务名删除任务
-	if *deleteName != "" {
-		// 获取备份存放目录
+	// 如果版本ID不为空, 但是任务ID为0, 则返回错误
+	if *deleteVersionID != "" && *deleteID == 0 {
+		return fmt.Errorf("指定了版本ID, 但是未指定任务ID")
+	}
+
+	// 检查是否同时指定了任务ID和任务名
+	if *deleteID != 0 && *deleteName != "" {
+		return fmt.Errorf("不能同时指定任务ID和任务名")
+	}
+
+	// 检查是否没有指定任务ID和任务名
+	if *deleteName == "" && *deleteID == 0 {
+		return fmt.Errorf("删除任务时, 必须指定任务名或任务ID")
+	}
+
+	// 共用的删除备份目录逻辑
+	deleteBackupDir := func(backupDir string) error {
+		if *deleteDirF {
+			if _, err := tools.CheckPath(backupDir); err == nil {
+				if err := os.RemoveAll(backupDir); err != nil {
+					return fmt.Errorf("删除备份存放目录失败: %w", err)
+				}
+				CL.PrintOkf("备份存放目录删除成功: %s", backupDir)
+			} else {
+				CL.PrintWarnf("请在稍后，手动删除备份存放目录: %s", backupDir)
+			}
+		}
+		return nil
+	}
+
+	// 根据任务名删除任务
+	if *deleteName != "" && *deleteVersionID == "" {
 		var backupDir string
-		backupDirSql := "select backup_directory from backup_tasks where task_name = ?"
+		backupDirSql := "SELECT backup_directory FROM backup_tasks WHERE task_name = ?"
 		if err := db.Get(&backupDir, backupDirSql, *deleteName); err == sql.ErrNoRows {
-			return fmt.Errorf("任务名不存在 %s", *deleteName)
+			return fmt.Errorf("任务名不存在: %s", *deleteName)
 		} else if err != nil {
 			return fmt.Errorf("获取备份存放目录失败: %w", err)
 		}
 
-		// 如果deleteDir为true, 则删除备份存放目录
-		if *deleteDirF {
-			// 删除备份存放目录(如果存在)
-			if _, err := tools.CheckPath(backupDir); err == nil {
-				if err := os.RemoveAll(backupDir); err != nil {
-					return fmt.Errorf("删除备份存放目录失败: %w", err)
-				} else {
-					// 打印成功信息
-					CL.PrintOkf("备份存放目录删除成功: %s", backupDir)
-				}
-			}
-		} else {
-			CL.PrintWarnf("请在稍后，手动删除备份存放目录: %s", backupDir)
+		// 删除备份目录
+		if err := deleteBackupDir(backupDir); err != nil {
+			return err
 		}
 
-		// 删除任务
-		deleteSql := "delete from backup_tasks where task_name = ?"
+		// 删除任务和备份记录
+		deleteSql := "DELETE FROM backup_tasks WHERE task_name = ?"
 		if _, err := db.Exec(deleteSql, *deleteName); err != nil {
 			return fmt.Errorf("删除任务失败: %w", err)
 		}
-
-		// 删除备份记录
-		deleteBackupSql := "delete from backup_records where task_name = ?"
+		deleteBackupSql := "DELETE FROM backup_records WHERE task_name = ?"
 		if _, err := db.Exec(deleteBackupSql, *deleteName); err != nil {
 			return fmt.Errorf("删除备份记录失败: %w", err)
 		}
 
-		// 打印成功信息
 		CL.PrintOkf("任务删除成功: %s", *deleteName)
-
 		return nil
 	}
 
-	// 如果deleteID不为0, 则根据任务ID删除任务
-	if *deleteID != 0 {
-		// 获取备份存放目录
+	// 根据任务ID删除任务
+	if *deleteID != 0 && *deleteVersionID == "" {
 		var backupDir string
-		backupDirSql := "select backup_directory from backup_tasks where task_id = ?"
+		backupDirSql := "SELECT backup_directory FROM backup_tasks WHERE task_id = ?"
 		if err := db.Get(&backupDir, backupDirSql, *deleteID); err == sql.ErrNoRows {
-			return fmt.Errorf("任务ID不存在 %d", *deleteID)
+			return fmt.Errorf("任务ID不存在: %d", *deleteID)
 		} else if err != nil {
 			return fmt.Errorf("获取备份存放目录失败: %w", err)
 		}
 
-		// 如果deleteDir为true, 则删除备份存放目录
-		if *deleteDirF {
-			// 删除备份存放目录(如果存在)
-			if _, err := tools.CheckPath(backupDir); err == nil {
-				if err := os.RemoveAll(backupDir); err != nil {
-					return fmt.Errorf("删除备份存放目录失败: %w", err)
-				} else {
-					// 打印成功信息
-					CL.PrintOkf("备份存放目录删除成功: %s", backupDir)
-				}
-			}
-		} else {
-			CL.PrintWarnf("请在稍后，手动删除备份存放目录: %s", backupDir)
+		// 删除备份目录
+		if err := deleteBackupDir(backupDir); err != nil {
+			return err
 		}
 
-		// 删除任务
-		deleteSql := "delete from backup_tasks where task_id = ?"
+		// 删除任务和备份记录
+		deleteSql := "DELETE FROM backup_tasks WHERE task_id = ?"
 		if _, err := db.Exec(deleteSql, *deleteID); err != nil {
 			return fmt.Errorf("删除任务失败: %w", err)
 		}
-
-		// 删除备份记录
-		deleteBackupSql := "delete from backup_records where task_id = ?"
+		deleteBackupSql := "DELETE FROM backup_records WHERE task_id = ?"
 		if _, err := db.Exec(deleteBackupSql, *deleteID); err != nil {
 			return fmt.Errorf("删除备份记录失败: %w", err)
 		}
 
-		// 打印成功信息
 		CL.PrintOkf("任务ID删除成功: %d", *deleteID)
+		return nil
+	}
+
+	// 根据任务ID和版本ID删除备份记录
+	if *deleteID != 0 && *deleteVersionID != "" {
+		// 获取根据任务ID和版本ID查询备份记录
+		var backupRecord struct {
+			BackupPath string `db:"backup_path"`      // 备份目录
+			BackupFile string `db:"backup_file_name"` // 备份文件
+		}
+		backupRecordSql := "select backup_path, backup_file_name from backup_records where task_id =? and version_id =?"
+		if err := db.Get(&backupRecord, backupRecordSql, *deleteID, *deleteVersionID); err == sql.ErrNoRows {
+			return fmt.Errorf("任务ID或版本ID不存在")
+		} else if err != nil {
+			return fmt.Errorf("查询备份记录失败: %w", err)
+		}
+
+		// 切换到备份目录
+		if err := os.Chdir(backupRecord.BackupPath); err != nil {
+			return fmt.Errorf("切换到备份目录失败: %w", err)
+		}
+
+		// 删除备份文件
+		if _, err := tools.CheckPath(backupRecord.BackupFile); err == nil {
+			if err := os.Remove(backupRecord.BackupFile); err != nil {
+				return fmt.Errorf("删除备份文件失败: %w", err)
+			}
+		} else {
+			CL.PrintWarnf("备份文件不存在: %s", backupRecord.BackupFile)
+		}
+
+		// 删除备份记录
+		deleteBackupSql := "delete from backup_records where task_id = ? and version_id = ?"
+		if _, err := db.Exec(deleteBackupSql, *deleteID, *deleteVersionID); err != nil {
+			return fmt.Errorf("删除备份记录失败: %w", err)
+		}
+
+		// 打印成功信息
+		CL.PrintOkf("任务ID: %d, 版本ID: %s 删除成功", *deleteID, *deleteVersionID)
 
 		return nil
 	}
 
-	return fmt.Errorf("删除任务时, 必须指定任务名或任务ID")
+	return nil
 }
 
 // listCmdMain 查询并打印任务列表
@@ -720,16 +786,17 @@ func editCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("编辑任务时, 必须指定任务ID")
 	}
 
-	// 编辑任务
-	editSql := "select task_name, retention_count from backup_tasks where task_id =?"
+	// 查询任务信息
+	editSql := "select task_name, retention_count,backup_directory from backup_tasks where task_id =?"
 	var task struct {
-		TaskName       string `db:"task_name"`       // 任务名
-		RetentionCount int    `db:"retention_count"` // 保留数量
+		TaskName        string `db:"task_name"`        // 任务名
+		RetentionCount  int    `db:"retention_count"`  // 保留数量
+		BackupDirectory string `db:"backup_directory"` // 备份目录
 	}
 	if err := db.Get(&task, editSql, *editID); err == sql.ErrNoRows {
 		return fmt.Errorf("任务ID不存在 %d", *editID)
 	} else if err != nil {
-		return fmt.Errorf("查询任务失败: %w", err)
+		return fmt.Errorf("查询任务失败: %w, SQL: %s, ID: %d", err, editSql, *editID)
 	}
 
 	// 如果指定了-n参数, 则更新任务名
@@ -742,51 +809,54 @@ func editCmdMain(db *sqlx.DB) error {
 		task.RetentionCount = *editKeep
 	}
 
-	// 更新任务
-	updateSql := "update backup_tasks set task_name = ?, retention_count = ? where task_id = ?"
-	if _, err := db.Exec(updateSql, task.TaskName, task.RetentionCount, *editID); err != nil {
-		return fmt.Errorf("更新任务失败: %w", err)
-	}
+	// 如果指定了-bn参数, 则更新备份目录
+	var oldDirName, rootPath, newDirName string
+	if *editNewDirName != "" {
+		newDirName = *editNewDirName
 
-	// 如果更新任务名, 则更新备份目录
-	if *editName != "" {
-		// 获取备份存放目录
-		var backupDir string
-		backupDirSql := "select backup_directory from backup_tasks where task_id =?"
-		if err := db.Get(&backupDir, backupDirSql, *editID); err != nil {
-			return fmt.Errorf("获取备份存放目录失败: %w", err)
+		// 检查备份目录名是否非法字符
+		if tools.ContainsSpecialChars(newDirName) {
+			return fmt.Errorf("备份目录名含非法字符, 请重试")
 		}
 
-		// 如果存在则，重命名备份存放目录
-		// if _, err := tools.CheckPath(backupDir); err == nil {
-		// 	if err := os.Rename(backupDir, filepath.Join(filepath.Dir(backupDir), *editName)); err != nil {
-		// 		return fmt.Errorf("重命名备份存放目录失败: %w", err)
-		// 	}
-		// }
-		CL.PrintWarnf("请在稍后，手动重命名备份存放目录: %s -> %s", backupDir, filepath.Join(filepath.Dir(backupDir), *editName))
+		rootPath = filepath.Dir(task.BackupDirectory)    // 获取备份目录的根路径
+		oldDirName = filepath.Base(task.BackupDirectory) // 获取备份目录的旧名称
 
-		// 更新备份存放目录
-		updateBackupDirSql := "update backup_tasks set backup_directory = ? where task_id = ?"
-		if _, err := db.Exec(updateBackupDirSql, filepath.Join(filepath.Dir(backupDir), *editName), *editID); err != nil {
-			return fmt.Errorf("更新备份存放目录失败: %w", err)
+		// 重命名备份目录
+		if err := tools.RenameBackupDirectory(rootPath, oldDirName, newDirName); err != nil {
+			return err
 		}
 
-		// 打印成功信息
-		CL.PrintOkf("备份存放目录已自动跟随任务名修改为: %s", filepath.Join(filepath.Dir(backupDir), *editName))
+		// 更新备份目录路径
+		task.BackupDirectory = filepath.Join(rootPath, newDirName)
 	}
 
-	// 查询并打印分别打印任务ID的当前任务信息
-	querySql := "select task_name, retention_count from backup_tasks where task_id =?"
-	if err := db.Get(&task, querySql, *editID); err != nil {
-		return fmt.Errorf("查询更新后的任务失败: %w", err)
+	// 更新任务事务
+	updateSql := "update backup_tasks set task_name = ?, retention_count = ? , backup_directory = ? where task_id = ?"
+
+	// 更新任务SQL
+	if _, err := db.Exec(updateSql, task.TaskName, task.RetentionCount, task.BackupDirectory, *editID); err != nil {
+		// 更新任务失败
+		if *editNewDirName != "" {
+			if err := tools.RenameBackupDirectory(rootPath, newDirName, oldDirName); err != nil {
+				return fmt.Errorf("更新任务失败且恢复备份目录失败: %w", err)
+			}
+			CL.PrintOkf("更新任务失败, 已恢复备份目录: %s", filepath.Join(rootPath, oldDirName))
+		}
+		return fmt.Errorf("更新任务失败: %w, SQL: %s, ID: %d", err, updateSql, *editID)
 	}
 
 	// 打印成功信息
 	CL.PrintOk("更新成功!")
-
-	// 打印任务信息
-	CL.PrintOkf("任务ID %d 的当前任务名为: %s", *editID, task.TaskName)
-	CL.PrintOkf("任务ID %d 的当前保留数量为: %d", *editID, task.RetentionCount)
+	if *editName != "" {
+		CL.PrintOkf("任务ID %d 的任务名已更新为: %s", *editID, task.TaskName)
+	}
+	if *editKeep != 0 {
+		CL.PrintOkf("任务ID %d 的保留数量已更新为: %d", *editID, task.RetentionCount)
+	}
+	if *editNewDirName != "" {
+		CL.PrintOkf("任务ID %d 的备份目录已更新为: %s", *editID, task.BackupDirectory)
+	}
 
 	return nil
 }
@@ -1544,6 +1614,62 @@ func unzipCmdMain() error {
 	// 解压ZIP文件
 	if err := tools.Unzip(*unzipFile, *unzipOutputDir); err != nil {
 		return fmt.Errorf("解压ZIP文件失败: %s", err)
+	}
+
+	return nil
+}
+
+// clearCmdMain 清除数据主逻辑
+func clearCmdMain(db *sqlx.DB) error {
+	// 检查是否确认
+	if !*clearConfirm {
+		return fmt.Errorf("请使用 -confirm 参数确认清除操作")
+	}
+
+	CL.PrintWarn("即将清空整个数据库和备份存放目录，这将删除所有备份任务和相关数据, 撤回可在三秒内按Ctrl+C退出")
+	time.Sleep(3 * time.Second) // 等待3秒
+
+	// 构建查询备份任务的SQL语句
+	querySql := "SELECT backup_directory FROM backup_tasks;"
+	// 定义存储查询结果的结构体
+	var tasks []struct {
+		BackupDirectory string `db:"backup_directory"` // 备份目录
+	}
+
+	// 执行查询备份任务的SQL语句
+	if err := db.Select(&tasks, querySql); err != nil {
+		return fmt.Errorf("查询备份任务失败: %w", err)
+	}
+
+	// 检查是否存在备份任务
+	if len(tasks) == 0 {
+		return fmt.Errorf("未找到任何备份任务")
+	}
+
+	// 构建清除备份任务的SQL语句
+	clearBackupTasksSql := "delete from backup_tasks;"
+
+	// 构建清空备份记录的SQL语句
+	clearBackupRecordsSql := "delete from backup_records;"
+
+	// 执行清除备份任务的SQL语句
+	if _, err := db.Exec(clearBackupTasksSql); err != nil {
+		return fmt.Errorf("清除备份任务失败: %w", err)
+	}
+
+	// 执行清空备份记录的SQL语句
+	if _, err := db.Exec(clearBackupRecordsSql); err != nil {
+		return fmt.Errorf("清空备份记录失败: %w", err)
+	}
+
+	// 遍历清理备份存放目录
+	for _, task := range tasks {
+		if err := os.RemoveAll(task.BackupDirectory); err != nil {
+			CL.PrintErrorf("清理备份存放目录失败: %s", task.BackupDirectory)
+			CL.PrintWarnf("请手动删除备份存放目录: %s", task.BackupDirectory)
+			continue
+		}
+		CL.PrintOkf("清理备份存放目录成功: %s", task.BackupDirectory)
 	}
 
 	return nil

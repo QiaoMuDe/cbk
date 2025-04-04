@@ -748,3 +748,34 @@ func SanitizePath(path *string) error {
 	*path = absPath
 	return nil
 }
+
+// RenameBackupDirectory 重命名备份目录
+// 参数：
+//
+//	rootPath - 备份存放目录的根路径
+//	oldDirName - 旧的备份目录名称
+//	newDirName - 新的备份目录名称
+//
+// 返回值：
+//
+//	error - 如果发生错误，返回错误信息；否则返回 nil
+func RenameBackupDirectory(rootPath, oldDirName, newDirName string) error {
+	if err := os.Chdir(rootPath); err != nil {
+		return fmt.Errorf("切换到备份存放目录的rootPath失败: %w, Path: %s", err, rootPath)
+	}
+
+	if _, err := CheckPath(newDirName); err == nil {
+		return fmt.Errorf("备份目录已存在: %s, 请重试", filepath.Join(rootPath, newDirName))
+	}
+
+	if _, err := CheckPath(oldDirName); err != nil {
+		return fmt.Errorf("旧的备份目录不存在: %s", filepath.Join(rootPath, oldDirName))
+	}
+
+	if err := os.Rename(oldDirName, newDirName); err != nil {
+		return fmt.Errorf("重命名备份目录失败: %w, Old: %s, New: %s", err, oldDirName, newDirName)
+	}
+
+	CL.PrintOkf("备份目录重命名成功: %s", filepath.Join(rootPath, newDirName))
+	return nil
+}
