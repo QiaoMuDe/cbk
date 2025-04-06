@@ -564,6 +564,8 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 		return fmt.Errorf("获取源目录大小失败: %w", err)
 	}
 
+	CL.PrintDbgf("源目录大小: %d", totalSize)
+
 	// 初始化进度条
 	bar := progressbar.DefaultBytes(
 		totalSize,
