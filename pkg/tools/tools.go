@@ -547,25 +547,25 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 
 	// 创建 ZIP 写入器
 	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
+	defer zipWriter.Close() // 确保在函数结束时关闭 ZIP 写入器
 
 	// 获取源目录的总大小，用于进度条
 	totalSize := int64(0)
+
+	// 遍历目录并计算总大小
 	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("遍历目录时出错: %w", err)
 		}
+		// 跳过目录本身
 		if !info.IsDir() {
 			totalSize += info.Size()
-			CL.PrintDbgf("文件: %s, 大小: %d", path, info.Size())
 		}
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("获取源目录大小失败: %w", err)
 	}
-
-	CL.PrintDbgf("源目录大小: %d", totalSize)
 
 	// 初始化进度条
 	bar := progressbar.DefaultBytes(
@@ -601,6 +601,7 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 		// 如果是目录，直接写入文件头
 		if info.IsDir() {
 			header.Name += "/" // 确保目录名以斜杠结尾
+			// 创建目录（如果需要）
 			if _, err := zipWriter.CreateHeader(header); err != nil {
 				return fmt.Errorf("创建 ZIP 目录失败: %w", err)
 			}
@@ -658,7 +659,7 @@ func Unzip(zipFilePath string, targetDir string) error {
 	// 获取 ZIP 文件的总大小
 	var totalSize uint64
 	for _, file := range zipReader.File {
-		totalSize += file.UncompressedSize64
+		totalSize += file.UncompressedSize64 // 通过 UncompressedSize64 获取未压缩的文件大小
 	}
 
 	// 创建进度条
