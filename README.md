@@ -132,4 +132,4 @@ cbk help
 
 - [sqlx](https://github.com/jmoiron/sqlx)：用于数据库操作。
 - [go-pretty](https://github.com/jedib0t/go-pretty)：用于表格输出。
-- [colorlib](https://gitee.com/MM-Q/colorlib)：用于命令行颜色渲染。
+- [colorlib](https://gitee.com/MM-Q/colorlib)：用于命令行颜色渲染。 

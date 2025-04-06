@@ -627,7 +627,7 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 			return fmt.Errorf("写入 ZIP 文件失败: %w", err)
 		}
 
-		// 更新进度条
+		// 更新进度条。
 		if err := bar.Add64(info.Size()); err != nil {
 			return fmt.Errorf("更新进度条失败: %w", err)
 		}
