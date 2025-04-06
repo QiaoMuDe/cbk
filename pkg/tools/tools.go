@@ -613,14 +613,12 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 			return fmt.Errorf("创建 ZIP 写入器失败: %w", err)
 		}
 
+		// 打开文件并写入内容
 		file, err := os.Open(path)
 		if err != nil {
 			return fmt.Errorf("打开文件失败: %w", err)
 		}
 		defer file.Close()
-
-		// 自定义写入器，用于更新进度条
-		//progressWriter := io.MultiWriter(fileWriter, bar) // bar 是一个全局的进度条对象
 
 		// 使用 io.CopyBuffer 并指定缓冲区大小
 		buffer := make([]byte, 1024*1024) // 1MB 缓冲区
@@ -628,7 +626,8 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 			return fmt.Errorf("写入 ZIP 文件失败: %w", err)
 		}
 
-		if err := bar.Add(int(info.Size())); err != nil {
+		// 更新进度条
+		if err := bar.Add64(info.Size()); err != nil {
 			return fmt.Errorf("更新进度条失败: %w", err)
 		}
 
