@@ -557,6 +557,7 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 		}
 		if !info.IsDir() {
 			totalSize += info.Size()
+			CL.PrintDbgf("文件: %s, 大小: %d", path, info.Size())
 		}
 		return nil
 	})
