@@ -478,6 +478,18 @@ func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath
 	return zipFilePath, nil
 }
 
+// UncompressFilesByOS 根据目标目录和文件名解压ZIP压缩文件
+// 参数:
+//
+// zipDir - 需要解压的ZIP文件所在目录路径
+//
+//	zipFileName - 需要解压的ZIP文件名
+//	outputPath - 解压后的文件存放路径
+//
+// 返回值:
+//
+//	string - 解压后的文件存放路径
+//	error - 操作过程中遇到的错误
 func UncompressFilesByOS(zipDir, zipFileName, outputPath string) (string, error) {
 	// 检查解压输出路径是否存在
 	if _, err := CheckPath(outputPath); err != nil {
@@ -578,7 +590,10 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 		if err != nil {
 			return fmt.Errorf("创建 ZIP 文件头失败: %w", err)
 		}
+		// 设置文件头的名称
 		header.Name = headerName
+		// 设置文件头的压缩方法
+		header.Method = zip.Deflate
 
 		// 如果是目录，直接写入文件头
 		if info.IsDir() {
@@ -601,24 +616,13 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 		}
 		defer file.Close()
 
-		// 使用缓冲区分块读取大文件
+		// 自定义写入器，用于更新进度条
+		progressWriter := io.MultiWriter(fileWriter, bar) // bar 是一个全局的进度条对象
+
+		// 使用 io.CopyBuffer 并指定缓冲区大小
 		buffer := make([]byte, 1024*1024) // 1MB 缓冲区
-		for {
-			n, err := file.Read(buffer)
-			if err != nil && err != io.EOF {
-				return fmt.Errorf("读取文件失败: %w", err)
-			}
-			if n == 0 {
-				break
-			}
-			_, err = fileWriter.Write(buffer[:n])
-			if err != nil {
-				return fmt.Errorf("写入 ZIP 文件失败: %w", err)
-			}
-			// 更新进度条// progressbar 库要求传入 int64 类型
-			if err := bar.Add64(int64(n)); err != nil {
-				return fmt.Errorf("更新进度条失败: %w", err)
-			}
+		if _, err := io.CopyBuffer(progressWriter, file, buffer); err != nil {
+			return fmt.Errorf("写入 ZIP 文件失败: %w", err)
 		}
 
 		return nil
@@ -684,23 +688,13 @@ func Unzip(zipFilePath string, targetDir string) error {
 		}
 		defer zipFileReader.Close()
 
-		// 使用缓冲区分块读取和写入文件内容
+		// 自定义写入器，用于更新进度条
+		progressWriter := io.MultiWriter(fileWriter, bar) // bar 是一个全局的进度条对象
+
+		// 使用 io.CopyBuffer 并指定缓冲区大小
 		buffer := make([]byte, 1024*1024) // 1MB 缓冲区
-		for {
-			n, err := zipFileReader.Read(buffer)
-			if err != nil && err != io.EOF {
-				return fmt.Errorf("读取 ZIP 文件内容失败: %w", err)
-			}
-			if n == 0 {
-				break
-			}
-			if _, err := fileWriter.Write(buffer[:n]); err != nil {
-				return fmt.Errorf("写入文件内容失败: %w", err)
-			}
-			// 更新进度条// progressbar 库要求传入 int64 类型
-			if err := bar.Add64(int64(n)); err != nil {
-				return fmt.Errorf("更新进度条失败: %w", err)
-			}
+		if _, err := io.CopyBuffer(progressWriter, zipFileReader, buffer); err != nil {
+			return fmt.Errorf("写入 ZIP 文件失败: %w", err)
 		}
 	}
 
