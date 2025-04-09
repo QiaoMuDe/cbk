@@ -17,6 +17,7 @@ cbk - 命令行备份任务管理工具
   zip                 将指定目标路径打包为ZIP压缩包
   unzip               将指定ZIP压缩包解压到指定路径
   clear               清除数据库记录及其数据目录
+  complete            生成指定类型的自动补全脚本
   version             显示当前版本信息
   help                显示帮助信息
 

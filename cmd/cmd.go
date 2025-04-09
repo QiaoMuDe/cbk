@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -76,6 +77,12 @@ var HelpUnpackText string // 定义子命令：unpack的帮助文本
 
 //go:embed help/help_clear.txt
 var HelpClearText string // 定义子命令：clear的帮助文本
+
+//go:embed help/help_complete.txt
+var HelpCompleteText string // 定义子命令：complete的帮助文本
+
+//go:embed autocomplete/bash/cbk.sh
+var BashCompletion string // 定义bash补全脚本
 
 // 定义子命令及其参数
 var (
@@ -152,6 +159,10 @@ var (
 	// 子命令：clear
 	clearCmd     = flag.NewFlagSet("clear", flag.ExitOnError)
 	clearConfirm = clearCmd.Bool("confirm", false, "确认是否执行清空数据操作")
+
+	// 子命令：complete
+	completeCmd  = flag.NewFlagSet("complete", flag.ExitOnError)
+	completeType = completeCmd.String("type", "", "指定要生成的自动补全脚本的类型。可选值: bash, powershell")
 )
 
 func init() {
@@ -218,6 +229,12 @@ func init() {
 	// 初始化clear命令的帮助信息
 	clearCmd.Usage = func() {
 		fmt.Println(HelpClearText)
+		os.Exit(0)
+	}
+
+	// 初始化complete命令的帮助信息
+	completeCmd.Usage = func() {
+		fmt.Println(HelpCompleteText)
 		os.Exit(0)
 	}
 }
@@ -455,6 +472,17 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		// 执行clear命令的逻辑
 		if err := clearCmdMain(db); err != nil {
 			return fmt.Errorf("清空数据库失败: %v", err)
+		}
+		return nil
+	case "complete":
+		// 解析complete命令的参数
+		if err := completeCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析complete命令参数失败: %v", err)
+		}
+
+		// 执行complete命令的逻辑
+		if err := completeCmdMain(*completeType); err != nil {
+			return fmt.Errorf("生成自动补全脚本失败: %v", err)
 		}
 		return nil
 	// 未知命令
@@ -1510,6 +1538,9 @@ func helpCmdMain(cmd string) error {
 	case "edit":
 		fmt.Println(HelpEditText)
 		return nil
+	case "complete":
+		fmt.Println(HelpCompleteText)
+		return nil
 	default:
 		return fmt.Errorf("未知命令: %s", cmd)
 	}
@@ -1670,6 +1701,38 @@ func clearCmdMain(db *sqlx.DB) error {
 			continue
 		}
 		CL.PrintOkf("清理备份存放目录成功: %s", task.BackupDirectory)
+	}
+
+	return nil
+}
+
+// completeCmdMain 自动补全主逻辑
+func completeCmdMain(t string) error {
+	// 检查自动补全类型是否为空
+	if t == "" {
+		return fmt.Errorf("请指定自动补全类型, 例如: 'cbk complete -type bash'")
+	}
+
+	switch t {
+	case "bash":
+		// 检查是否为Linux或Mac系统
+		if runtime.GOOS != "linux" {
+			return fmt.Errorf("自动补全类型 'bash' 仅在Linux上受支持")
+		}
+
+		// 打印自动补全脚本
+		fmt.Println(BashCompletion)
+		return nil
+	case "powershell":
+		// 检查是否为Windows系统
+		if runtime.GOOS != "windows" {
+			return fmt.Errorf("自动补全类型 'powershell' 仅在Windows系统上受支持")
+		}
+
+		// 打印自动补全脚本
+		fmt.Println("暂未实现")
+	default:
+		return fmt.Errorf("未知的自动补全类型: %s", t)
 	}
 
 	return nil
