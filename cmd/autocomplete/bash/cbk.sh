@@ -96,6 +96,7 @@ _cbk()
             opts="-type --type"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
+            ;;
         *)
             # 如果前一个单词不匹配任何已知命令，不做任何操作
             ;;
