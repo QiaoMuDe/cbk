@@ -16,7 +16,7 @@ _cbk()
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # 定义所有可用的子命令和选项
-    opts="list run add delete edit log show unpack zip unzip clear version help --help -h -v -vv"
+    opts="list run add delete edit log show unpack zip unzip clear complete version help --help -h -v -vv"
 
     # 根据前一个单词（prev）来决定补全的内容
     case "${prev}" in
