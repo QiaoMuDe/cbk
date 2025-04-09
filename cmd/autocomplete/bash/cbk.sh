@@ -31,8 +31,20 @@ _cbk()
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
+        a)
+            # 如果前一个单词是 a，补全 a 命令的选项
+            opts="-n -t -b -k -bn -h"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            return 0
+            ;;
         delete)
             # 如果前一个单词是 delete，补全 delete 命令的选项
+            opts="-id -n -d -v -h"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            return 0
+            ;;
+        d)
+            # 如果前一个单词是 d，补全 d 命令的选项
             opts="-id -n -d -v -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
@@ -43,8 +55,20 @@ _cbk()
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
+        e)
+            # 如果前一个单词是 e，补全 e 命令的选项
+            opts="-id -n -k -bn -h"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            return 0
+            ;;
         list)
             # 如果前一个单词是 list，补全 list 命令的选项
+            opts="-ts -no-table -nt -h"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            return 0
+            ;;
+        l)
+            # 如果前一个单词是 l，补全 l 命令的选项
             opts="-ts -no-table -nt -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
@@ -61,8 +85,20 @@ _cbk()
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
+        r)
+            # 如果前一个单词是 r，补全 r 命令的选项
+            opts="-id -h"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            return 0
+            ;;
         show)
             # 如果前一个单词是 show，补全 show 命令的选项
+            opts="-id -v -ts -no-table -nt -h"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            return 0
+            ;;
+        s)
+            # 如果前一个单词是 s，补全 s 命令的选项
             opts="-id -v -ts -no-table -nt -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
@@ -73,14 +109,32 @@ _cbk()
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
+        u)
+            # 如果前一个单词是 u，补全 u 命令的选项
+            opts="-id -v -o -h"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            return 0
+            ;;
         zip)
             # 如果前一个单词是 zip，补全 zip 命令的选项
             opts="-o -t -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
+        z)
+            # 如果前一个单词是 z，补全 z 命令的选项
+            opts="-o -t -h"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            return 0
+            ;;
         unzip)
             # 如果前一个单词是 unzip，补全 unzip 命令的选项
+            opts="-f -d -h"
+            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+            return 0
+            ;;
+        uz)
+            # 如果前一个单词是 uz，补全 uz 命令的选项
             opts="-f -d -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0

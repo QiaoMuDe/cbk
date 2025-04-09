@@ -1723,17 +1723,7 @@ func completeCmdMain(t string) error {
 		// 打印自动补全脚本
 		fmt.Println(BashCompletion)
 		return nil
-	case "powershell":
-		// 检查是否为Windows系统
-		if runtime.GOOS != "windows" {
-			return fmt.Errorf("自动补全类型 'powershell' 仅在Windows系统上受支持")
-		}
-
-		// 打印自动补全脚本
-		fmt.Println("暂未实现")
 	default:
 		return fmt.Errorf("未知的自动补全类型: %s", t)
 	}
-
-	return nil
 }

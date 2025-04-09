@@ -10,6 +10,9 @@
   cbk complete -type bash
   为当前命令行工具生成 bash 类型的自动补全脚本。
 
+  source <(cbk complete -type bash)
+  为当前命令行工具安装 bash 类型的自动补全脚本。可以保存在~/.bashrc 文件中，以便在每次打开终端时自动加载。
+
 注意：
   1. 类型：必须指定一个有效的类型，目前支持 bash 和 powershell。
   2. 安装：生成的自动补全脚本需要手动安装到相应的命令行环境中。
