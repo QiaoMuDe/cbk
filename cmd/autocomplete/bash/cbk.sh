@@ -27,73 +27,73 @@ _cbk()
             ;;
         add)
             # 如果前一个单词是 add，补全 add 命令的选项
-            opts="-n -t -b -k -bn"
+            opts="-n -t -b -k -bn -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         delete)
             # 如果前一个单词是 delete，补全 delete 命令的选项
-            opts="-id -n -d -v"
+            opts="-id -n -d -v -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         edit)
             # 如果前一个单词是 edit，补全 edit 命令的选项
-            opts="-id -n -k -bn"
+            opts="-id -n -k -bn -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         list)
             # 如果前一个单词是 list，补全 list 命令的选项
-            opts="-ts -no-table -nt"
+            opts="-ts -no-table -nt -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         log)
             # 如果前一个单词是 log，补全 log 命令的选项
-            opts="-l -v -ts -no-table -nt"
+            opts="-l -v -ts -no-table -nt -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         run)
             # 如果前一个单词是 run，补全 run 命令的选项
-            opts="-id"
+            opts="-id -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         show)
             # 如果前一个单词是 show，补全 show 命令的选项
-            opts="-id -v -ts -no-table -nt"
+            opts="-id -v -ts -no-table -nt -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         unpack)
             # 如果前一个单词是 unpack，补全 unpack 命令的选项
-            opts="-id -v -o"
+            opts="-id -v -o -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         zip)
             # 如果前一个单词是 zip，补全 zip 命令的选项
-            opts="-o -t"
+            opts="-o -t -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         unzip)
             # 如果前一个单词是 unzip，补全 unzip 命令的选项
-            opts="-f -d"
+            opts="-f -d -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         clear)
             # 如果前一个单词是 clear，补全 clear 命令的选项
-            opts="-confirm"
+            opts="-confirm -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
         complete)
             # 如果前一个单词是 complete，补全 complete 命令的选项
-            opts="-type --type"
+            opts="-type -h"
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0
             ;;
@@ -105,7 +105,7 @@ _cbk()
     # 如果前一个单词是 -id，补全任务 ID
     if [[ ${prev} == "-id" ]]; then
         # 获取任务 ID 列表
-        local task_ids=$(cbk list -nt | awk '{print $1}' | grep -v "ID")
+        local task_ids=$(cbk list -nt | awk 'NR>1 {print $2}')
         COMPREPLY=( $(compgen -W "${task_ids}" -- ${cur}) )
         return 0
     fi
