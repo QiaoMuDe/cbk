@@ -606,53 +606,154 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 		// 替换路径分隔符为正斜杠（ZIP 文件格式要求）
 		headerName = filepath.ToSlash(headerName)
 
-		// 创建 ZIP 文件头
-		header, err := zip.FileInfoHeader(info)
+		// 获取文件的详细状态
+		fileStat, err := os.Lstat(path)
 		if err != nil {
-			return fmt.Errorf("创建 ZIP 文件头失败: %w", err)
+			return fmt.Errorf("获取文件状态失败: %w", err)
 		}
-		// 设置文件头的名称
-		header.Name = headerName
-		// 设置文件头的压缩方法
-		header.Method = zip.Deflate
 
-		// 如果是目录，直接写入文件头
-		if info.IsDir() {
-			header.Name += "/" // 确保目录名以斜杠结尾
-			// 创建目录（如果需要）
+		// 根据文件类型处理
+		switch mode := fileStat.Mode(); {
+		case mode.IsRegular():
+			// 普通文件
+			header, err := zip.FileInfoHeader(info)
+			if err != nil {
+				return fmt.Errorf("创建 ZIP 文件头失败: %w", err)
+			}
+			// 设置文件头的名称
+			header.Name = headerName
+
+			// 设置压缩方法为 Deflate
+			header.Method = zip.Deflate
+
+			// 创建 ZIP 写入器
+			fileWriter, err := zipWriter.CreateHeader(header)
+			if err != nil {
+				return fmt.Errorf("创建 ZIP 写入器失败: %w", err)
+			}
+
+			// 打开文件并写入 ZIP 包
+			file, err := os.Open(path)
+			if err != nil {
+				return fmt.Errorf("打开文件失败: %w", err)
+			}
+			defer file.Close()
+
+			// 使用缓冲区进行文件复制，提高性能
+			buffer := make([]byte, 1024*1024) // 1MB 缓冲区
+			if _, err := io.CopyBuffer(fileWriter, file, buffer); err != nil {
+				return fmt.Errorf("写入 ZIP 文件失败: %w", err)
+			}
+
+			// 更新进度条
+			if err := bar.Add64(info.Size()); err != nil {
+				return fmt.Errorf("更新进度条失败: %w", err)
+			}
+
+		case mode.IsDir():
+			// 目录
+			header, err := zip.FileInfoHeader(info)
+			if err != nil {
+				return fmt.Errorf("创建 ZIP 文件头失败: %w", err)
+			}
+			// 设置目录的名称，末尾添加斜杠
+			header.Name = headerName + "/"
+
+			// 设置压缩方法为 Store（不压缩）
+			header.Method = zip.Store
+
+			// 创建目录
 			if _, err := zipWriter.CreateHeader(header); err != nil {
 				return fmt.Errorf("创建 ZIP 目录失败: %w", err)
 			}
-			return nil
-		}
 
-		// 如果是文件，写入文件内容
-		fileWriter, err := zipWriter.CreateHeader(header)
-		if err != nil {
-			return fmt.Errorf("创建 ZIP 写入器失败: %w", err)
-		}
+			// 更新进度条
+			if err := bar.Add64(int64(1)); err != nil {
+				return fmt.Errorf("更新进度条失败: %w", err)
+			}
 
-		// 打开文件并写入内容
-		file, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("打开文件失败: %w", err)
-		}
-		defer file.Close()
+		case mode&os.ModeSymlink != 0:
+			// 软链接
+			target, err := os.Readlink(path)
+			if err != nil {
+				return fmt.Errorf("读取软链接目标失败: %w", err)
+			}
 
-		// 使用 io.CopyBuffer 并指定缓冲区大小
-		buffer := make([]byte, 1024*1024) // 1MB 缓冲区
-		if _, err := io.CopyBuffer(fileWriter, file, buffer); err != nil {
-			return fmt.Errorf("写入 ZIP 文件失败: %w", err)
-		}
+			// 创建软链接文件头
+			header := &zip.FileHeader{
+				Name:   headerName,
+				Method: zip.Store,
+			}
+			// 设置软链接的元数据
+			header.SetMode(mode)
 
-		// 更新进度条。
-		if err := bar.Add64(info.Size()); err != nil {
-			return fmt.Errorf("更新进度条失败: %w", err)
+			// 创建软链接
+			writer, err := zipWriter.CreateHeader(header)
+			if err != nil {
+				return fmt.Errorf("创建 ZIP 软链接失败: %w", err)
+			}
+			if _, err := writer.Write([]byte(target)); err != nil {
+				return fmt.Errorf("写入软链接目标失败: %w", err)
+			}
+
+			// 更新进度条
+			if err := bar.Add64(int64(1)); err != nil {
+				return fmt.Errorf("更新进度条失败: %w", err)
+			}
+
+		case mode&os.ModeDevice != 0:
+			// 设备文件
+			header := &zip.FileHeader{
+				Name:   headerName,
+				Method: zip.Store,
+			}
+			// 设置设备文件的元数据
+			header.SetMode(mode)
+
+			// 创建设备文件
+			writer, err := zipWriter.CreateHeader(header)
+			if err != nil {
+				return fmt.Errorf("创建 ZIP 设备文件失败: %w", err)
+			}
+			// 设备文件通常不包含数据，只记录其元数据
+			if _, err := writer.Write([]byte{}); err != nil {
+				return fmt.Errorf("写入设备文件失败: %w", err)
+			}
+
+			// 更新进度条
+			if err := bar.Add64(int64(1)); err != nil {
+				return fmt.Errorf("更新进度条失败: %w", err)
+			}
+
+		default:
+			// 其他特殊文件类型
+			header := &zip.FileHeader{
+				Name:   headerName,
+				Method: zip.Store,
+			}
+			// 设置特殊文件的元数据
+			header.SetMode(mode)
+
+			// 创建特殊文件
+			writer, err := zipWriter.CreateHeader(header)
+			if err != nil {
+				return fmt.Errorf("创建 ZIP 特殊文件失败: %w", err)
+			}
+			// 特殊文件通常不包含数据，只记录其元数据
+			if _, err := writer.Write([]byte{}); err != nil {
+				return fmt.Errorf("写入特殊文件失败: %w", err)
+			}
+
+			// 更新进度条
+			if err := bar.Add64(int64(1)); err != nil {
+				return fmt.Errorf("更新进度条失败: %w", err)
+			}
 		}
 
 		return nil
 	})
 
+	// 检查是否有错误发生
 	if err != nil {
 		return fmt.Errorf("打包目录到 ZIP 失败: %w", err)
 	}
