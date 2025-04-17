@@ -46,57 +46,57 @@ var (
 )
 
 //go:embed help/help_list.txt
-var HelpListText string // 定义子命令：list的帮助文本
+var HelpListText string // 定义子命令: list的帮助文本
 
 //go:embed help/help_run.txt
-var HelpRunText string // 定义子命令：run的帮助文本
+var HelpRunText string // 定义子命令: run的帮助文本
 
 //go:embed help/help_add.txt
-var HelpAddText string // 定义子命令：add的帮助文本
+var HelpAddText string // 定义子命令: add的帮助文本
 
 //go:embed help/help_delete.txt
-var HelpDeleteText string // 定义子命令：delete的帮助文本
+var HelpDeleteText string // 定义子命令: delete的帮助文本
 
 //go:embed help/help_edit.txt
-var HelpEditText string // 定义子命令：edit的帮助文本
+var HelpEditText string // 定义子命令: edit的帮助文本
 
 //go:embed help/help_log.txt
-var HelpLogText string // 定义子命令：log的帮助文本
+var HelpLogText string // 定义子命令: log的帮助文本
 
 //go:embed help/help_show.txt
-var HelpShowText string // 定义子命令：show的帮助文本
+var HelpShowText string // 定义子命令: show的帮助文本
 
 //go:embed help/help_zip.txt
-var HelpZipText string // 定义子命令：zip的帮助文本
+var HelpZipText string // 定义子命令: zip的帮助文本
 
 //go:embed help/help_unzip.txt
-var HelpUnzipText string // 定义子命令：unzip的帮助文本
+var HelpUnzipText string // 定义子命令: unzip的帮助文本
 
 //go:embed help/help_unpack.txt
-var HelpUnpackText string // 定义子命令：unpack的帮助文本
+var HelpUnpackText string // 定义子命令: unpack的帮助文本
 
 //go:embed help/help_clear.txt
-var HelpClearText string // 定义子命令：clear的帮助文本
+var HelpClearText string // 定义子命令: clear的帮助文本
 
 //go:embed help/help_complete.txt
-var HelpCompleteText string // 定义子命令：complete的帮助文本
+var HelpCompleteText string // 定义子命令: complete的帮助文本
 
 //go:embed autocomplete/bash/cbk.sh
 var BashCompletion string // 定义bash补全脚本
 
 // 定义子命令及其参数
 var (
-	// 子命令：list
+	// 子命令: list
 	listCmd          = flag.NewFlagSet("list", flag.ExitOnError)
 	listTableStyle   = listCmd.String("ts", "default", "表格样式(default, bold, colorbright, colordark, double, light, rounded, bd, cb, cd, de, lt, ro)")
 	listNoTable      = listCmd.Bool("no-table", false, "是否禁用表格输出")
 	listNoTableShort = listCmd.Bool("nt", false, "是否禁用表格输出")
 
-	// 子命令：run
+	// 子命令: run
 	runCmd = flag.NewFlagSet("run", flag.ExitOnError)
 	runID  = runCmd.Int("id", 0, "任务ID")
 
-	// 子命令：add
+	// 子命令: add
 	addCmd           = flag.NewFlagSet("add", flag.ExitOnError)
 	addName          = addCmd.String("n", "", "任务名")
 	addTarget        = addCmd.String("t", "", "目标目录路径")
@@ -105,21 +105,21 @@ var (
 	addBackupDirName = addCmd.String("bn", "", "备份目录名(默认: 目标目录名)")
 	addNoCompression = addCmd.Bool("nc", false, "是否禁用压缩（默认启用压缩）")
 
-	// 子命令：delete
+	// 子命令: delete
 	deleteCmd       = flag.NewFlagSet("delete", flag.ExitOnError)
 	deleteID        = deleteCmd.Int("id", 0, "任务ID")
 	deleteName      = deleteCmd.String("n", "", "任务名")
 	deleteDirF      = deleteCmd.Bool("d", false, "在删除任务时，是否同时删除备份文件。若启用此选项，备份文件将被一同删除")
 	deleteVersionID = deleteCmd.String("v", "", "指定要删除的备份版本ID")
 
-	// 子命令：edit
+	// 子命令: edit
 	editCmd        = flag.NewFlagSet("edit", flag.ExitOnError)
 	editName       = editCmd.String("n", "", "指定新的任务名。如果未指定，则任务名保持不变")
 	editID         = editCmd.Int("id", 0, "指定要编辑的备份任务ID")
 	editKeep       = editCmd.Int("k", 3, "指定备份文件的保留数量。如果未指定，则保留数量保持不变")
 	editNewDirName = editCmd.String("bn", "", "指定新的备份目录名。如果未指定，则备份目录名保持不变")
 
-	// 子命令：log
+	// 子命令: log
 	logCmd          = flag.NewFlagSet("log", flag.ExitOnError)
 	logLimit        = logCmd.Int("l", 10, "显示的行数")
 	logView         = logCmd.Bool("v", false, "是否显示详细日志")
@@ -127,7 +127,7 @@ var (
 	logNoTable      = logCmd.Bool("no-table", false, "是否禁用表格输出")
 	logNoTableShort = logCmd.Bool("nt", false, "是否禁用表格输出")
 
-	// 子命令：show
+	// 子命令: show
 	showCmd          = flag.NewFlagSet("show", flag.ExitOnError)
 	showID           = showCmd.Int("id", 0, "任务ID")
 	showView         = showCmd.Bool("v", false, "是否显示详细信息")
@@ -135,34 +135,34 @@ var (
 	showNoTable      = showCmd.Bool("no-table", false, "是否禁用表格输出")
 	showNoTableShort = showCmd.Bool("nt", false, "是否禁用表格输出")
 
-	// 子命令：unpack
+	// 子命令: unpack
 	unpackCmd       = flag.NewFlagSet("unpack", flag.ExitOnError)
 	unpackID        = unpackCmd.Int("id", 0, "任务ID")
 	unpackVersionID = unpackCmd.String("v", "", "指定解压的版本ID")
 	unpackOutput    = unpackCmd.String("o", ".", "指定输出的路径(默认当前目录)")
 
-	// 子命令：zip
+	// 子命令: zip
 	zipCmd           = flag.NewFlagSet("zip", flag.ExitOnError)
 	zipOutput        = zipCmd.String("o", "未命名.zip", "指定输出的压缩包名(默认: 未命名.zip)")
 	zipTarget        = zipCmd.String("t", "", "指定要打包的目标路径")
 	zipNoCompression = zipCmd.Bool("nc", false, "是否禁用压缩（默认启用压缩）")
 
-	// 子命令：unzip
+	// 子命令: unzip
 	unzipCmd       = flag.NewFlagSet("unzip", flag.ExitOnError)
 	unzipFile      = unzipCmd.String("f", "", "指定要解压的压缩文件名")
 	unzipOutputDir = unzipCmd.String("d", ".", "指定解压的目标路径。如果未指定，则解压到当前目录")
 
-	// 子命令：version
+	// 子命令: version
 	versionCmd = flag.NewFlagSet("version", flag.ExitOnError)
 
-	// 子命令：help
+	// 子命令: help
 	helpCmd = flag.NewFlagSet("help", flag.ExitOnError)
 
-	// 子命令：clear
+	// 子命令: clear
 	clearCmd     = flag.NewFlagSet("clear", flag.ExitOnError)
 	clearConfirm = clearCmd.Bool("confirm", false, "确认是否执行清空数据操作")
 
-	// 子命令：complete
+	// 子命令: complete
 	completeCmd  = flag.NewFlagSet("complete", flag.ExitOnError)
 	completeType = completeCmd.String("type", "", "指定要生成的自动补全脚本的类型。可选值: bash, powershell")
 )
@@ -1025,13 +1025,13 @@ func runCmdMain(db *sqlx.DB) error {
 }
 
 // logCmdMain 函数，支持分页查询
-// 参数：
+// 参数: 
 //
 //	db - 数据库连接
 //	page - 页码
 //	pageSize - 每页记录数
 //
-// 返回值：
+// 返回值: 
 //
 //	error - 如果发生错误，返回错误信息；否则返回 nil
 func logCmdMain(db *sqlx.DB, page, pageSize int) error {
