@@ -103,6 +103,7 @@ var (
 	addBackup        = addCmd.String("b", "", "备份存放路径(默认: 用户主目录/.cbk/[项目名]/")
 	addKeep          = addCmd.Int("k", 3, "保留数量")
 	addBackupDirName = addCmd.String("bn", "", "备份目录名(默认: 目标目录名)")
+	addNoCompression = addCmd.Bool("nc", false, "是否禁用压缩（默认启用压缩）")
 
 	// 子命令：delete
 	deleteCmd       = flag.NewFlagSet("delete", flag.ExitOnError)
@@ -141,9 +142,10 @@ var (
 	unpackOutput    = unpackCmd.String("o", ".", "指定输出的路径(默认当前目录)")
 
 	// 子命令：zip
-	zipCmd    = flag.NewFlagSet("zip", flag.ExitOnError)
-	zipOutput = zipCmd.String("o", "未命名.zip", "指定输出的压缩包名(默认: 未命名.zip)")
-	zipTarget = zipCmd.String("t", "", "指定要打包的目标路径")
+	zipCmd           = flag.NewFlagSet("zip", flag.ExitOnError)
+	zipOutput        = zipCmd.String("o", "未命名.zip", "指定输出的压缩包名(默认: 未命名.zip)")
+	zipTarget        = zipCmd.String("t", "", "指定要打包的目标路径")
+	zipNoCompression = zipCmd.Bool("nc", false, "是否禁用压缩（默认启用压缩）")
 
 	// 子命令：unzip
 	unzipCmd       = flag.NewFlagSet("unzip", flag.ExitOnError)
@@ -587,9 +589,17 @@ func addCmdMain(db *sqlx.DB) error {
 		}
 	}
 
+	// 获取是否禁用压缩
+	var noCompression int
+	if *addNoCompression {
+		noCompression = 1 // 启用压缩
+	} else {
+		noCompression = 0 // 禁用压缩(默认启用压缩)
+	}
+
 	// 插入新任务到数据库
-	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count) values(?, ?, ?, ?)"
-	if _, err := db.Exec(insertSql, *addName, AbsAddTarget, *addBackup, *addKeep); err != nil {
+	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count, no_compression) values(?, ?, ?, ?, ?)"
+	if _, err := db.Exec(insertSql, *addName, AbsAddTarget, *addBackup, *addKeep, noCompression); err != nil {
 		return fmt.Errorf("插入任务失败: %w", err)
 	}
 
@@ -734,16 +744,19 @@ func deleteCmdMain(db *sqlx.DB) error {
 // listCmdMain 查询并打印任务列表
 func listCmdMain(db *sqlx.DB) error {
 	// 查询所有任务
-	querySql := "SELECT task_id, task_name, target_directory, backup_directory, retention_count FROM backup_tasks;"
+	querySql := "SELECT task_id, task_name, target_directory, backup_directory, retention_count, no_compression FROM backup_tasks;"
 
+	// 定义任务列表结构体
 	var tasks []struct {
 		TaskID          int    `db:"task_id"`          // 任务ID
 		TaskName        string `db:"task_name"`        // 任务名
 		TargetDirectory string `db:"target_directory"` // 目标目录
 		BackupDirectory string `db:"backup_directory"` // 备份目录
 		RetentionCount  int    `db:"retention_count"`  // 保留数量
+		NoCompression   int    `db:"no_compression"`   // 是否禁用压缩(默认启用压缩, 0 表示启用压缩, 1 表示禁用压缩)
 	}
 
+	// 查询任务列表
 	if err := db.Select(&tasks, querySql); err != nil {
 		return fmt.Errorf("查询任务失败: %w", err)
 	}
@@ -751,10 +764,16 @@ func listCmdMain(db *sqlx.DB) error {
 	// 禁用表格的输出
 	if *listNoTable || *listNoTableShort {
 		// 打印任务列表
-		fmt.Printf("%-30s %-10s %-15s %-30s %-30s\n",
-			"任务名", "任务ID", "保留数量", "目标目录", "备份目录")
+		fmt.Printf("%-30s %-10s %-15s %-30s %-30s %-20s\n",
+			"任务名", "任务ID", "保留数量", "目标目录", "备份目录", "是否禁用压缩")
 		for _, task := range tasks {
-			fmt.Printf("%-30s %-10d %-15d %-30s %-30s\n", task.TaskName, task.TaskID, task.RetentionCount, task.TargetDirectory, task.BackupDirectory)
+			fmt.Printf("%-30s %-10d %-15d %-30s %-30s %-10s\n", task.TaskName, task.TaskID, task.RetentionCount, task.TargetDirectory, task.BackupDirectory, func() string {
+				if task.NoCompression == 0 {
+					return "false"
+				} else {
+					return "true"
+				}
+			}())
 		}
 
 		return nil
@@ -779,7 +798,7 @@ func listCmdMain(db *sqlx.DB) error {
 	t.SetOutputMirror(os.Stdout)
 
 	// 设置表头
-	t.AppendHeader(table.Row{"ID", "任务名", "保留数量", "目标目录", "备份目录"})
+	t.AppendHeader(table.Row{"ID", "任务名", "保留数量", "目标目录", "备份目录", "是否禁用压缩"})
 
 	// 设置列配置
 	t.SetColumnConfigs([]table.ColumnConfig{
@@ -788,6 +807,7 @@ func listCmdMain(db *sqlx.DB) error {
 		{Name: "保留数量", Align: text.AlignCenter, WidthMaxEnforcer: text.WrapHard},
 		{Name: "目标目录", Align: text.AlignLeft, WidthMaxEnforcer: text.WrapHard},
 		{Name: "备份目录", Align: text.AlignLeft, WidthMaxEnforcer: text.WrapHard},
+		{Name: "是否禁用压缩", Align: text.AlignCenter, WidthMaxEnforcer: text.WrapHard},
 	})
 
 	// 添加数据行
@@ -798,6 +818,13 @@ func listCmdMain(db *sqlx.DB) error {
 			task.RetentionCount,
 			task.TargetDirectory,
 			task.BackupDirectory,
+			func() string {
+				if task.NoCompression == 0 {
+					return "false"
+				} else {
+					return "true"
+				}
+			}(),
 		})
 	}
 
@@ -896,14 +923,19 @@ func runCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("运行备份任务时, 必须指定任务ID")
 	}
 
-	// 获取任务信息
+	// 构建存储查询任务信息的结构体
 	var task struct {
 		TaskName        string `db:"task_name"`        // 任务名
 		TargetDirectory string `db:"target_directory"` // 目标目录
 		BackupDirectory string `db:"backup_directory"` // 备份目录
 		RetentionCount  int    `db:"retention_count"`  // 保留数量
+		NoCompression   int    `db:"no_compression"`   // 是否禁用压缩(默认启用压缩, 0 表示启用压缩, 1 表示禁用压缩)
 	}
-	querySql := "select task_name, target_directory, backup_directory, retention_count from backup_tasks where task_id =?"
+
+	// 构建查询任务信息的SQL语句
+	querySql := "select task_name, target_directory, backup_directory, retention_count, no_compression from backup_tasks where task_id =?"
+
+	// 查询任务信息
 	if err := db.Get(&task, querySql, *runID); err == sql.ErrNoRows {
 		return fmt.Errorf("任务ID不存在 %d", *runID)
 	} else if err != nil {
@@ -938,7 +970,7 @@ func runCmdMain(db *sqlx.DB) error {
 	backupFileNamePath := filepath.Join(task.BackupDirectory, backupFileNamePrefix) // 获取构建的备份文件路径
 
 	// 执行备份任务
-	zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath)
+	zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath, task.NoCompression)
 	if err != nil {
 		errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, data_status, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		if _, err := db.Exec(errorSql, versionID, *runID, backupTime, task.TaskName, "false", "-", "-", "-", "0", "-"); err != nil {
@@ -1591,8 +1623,16 @@ func zipCmdMain() error {
 		return fmt.Errorf("指定的目录路径不存在: %s", *zipTarget)
 	}
 
+	// 获取是否禁用压缩
+	var noCompression int
+	if *zipNoCompression {
+		noCompression = 1 // 禁用压缩
+	} else {
+		noCompression = 0 // 默认启用压缩
+	}
+
 	// 创建ZIP文件
-	if err := tools.CreateZip(*zipOutput, *zipTarget); err != nil {
+	if err := tools.CreateZip(*zipOutput, *zipTarget, noCompression); err != nil {
 		return fmt.Errorf("创建ZIP文件失败: %w", err)
 	}
 

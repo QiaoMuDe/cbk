@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS backup_tasks (
     task_name TEXT, -- 备份任务的名称
     target_directory TEXT, -- 需要备份的目标目录
     backup_directory TEXT, -- 备份文件存放的目标目录
-    retention_count INTEGER -- 保留的备份版本数量
+    retention_count INTEGER, -- 保留的备份版本数量
+    no_compression INTEGER  -- 是否禁用压缩（默认启用压缩，设置为 0 表示启用压缩, 1 表示禁用压缩）
 );
 
 -- 创建备份记录表，用于存储每次备份任务的详细记录

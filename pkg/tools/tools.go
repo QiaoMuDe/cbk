@@ -455,12 +455,13 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 //	targetDir - 需要压缩的目标目录路径
 //	targetName - 需要压缩的目标名称(文件或目录名)
 //	backupFileNamePath - 备份文件的基础路径(不含扩展名)
+//	noCompression - 是否禁用压缩，默认为false
 //
 // 返回值:
 //
 //	string - 生成的ZIP文件完整路径
 //	error - 操作过程中遇到的错误
-func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath string) (string, error) {
+func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath string, noCompression int) (string, error) {
 	// 构建完整的压缩文件路径(添加扩展名)
 	zipFilePath := fmt.Sprintf("%s%s", backupFileNamePath, ".zip")
 
@@ -470,7 +471,7 @@ func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath
 	}
 
 	// 调用CreateZip函数执行实际压缩操作
-	if err := CreateZip(zipFilePath, targetName); err != nil {
+	if err := CreateZip(zipFilePath, targetName, noCompression); err != nil {
 		return "", fmt.Errorf("压缩文件时出错: %w", err)
 	}
 
@@ -520,7 +521,16 @@ func UncompressFilesByOS(zipDir, zipFileName, outputPath string) (string, error)
 }
 
 // CreateZip 函数用于创建ZIP压缩文件
-func CreateZip(zipFilePath string, sourceDir string) error {
+// 参数:
+//
+//	zipFilePath - 生成的ZIP文件路径
+//	sourceDir - 需要压缩的源目录路径
+//	noCompression - 是否禁用压缩，默认为false
+//
+// 返回值:
+//
+//	error - 操作过程中遇到的错误
+func CreateZip(zipFilePath string, sourceDir string, noCompression int) error {
 	// 检查zipFilePath是否为绝对路径，如果不是，将其转换为绝对路径
 	if !filepath.IsAbs(zipFilePath) {
 		absPath, err := filepath.Abs(zipFilePath)
@@ -536,6 +546,15 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 			return fmt.Errorf("转换sourceDir为绝对路径失败: %w", err)
 		}
 		sourceDir = absPath
+	}
+
+	// 获取是否压缩的标志
+	var deflateOrStore uint16
+	// 根据noCompression参数设置压缩方法, 默认使用Deflate压缩
+	if noCompression == 1 {
+		deflateOrStore = zip.Store // 等于1时，表示禁用压缩
+	} else {
+		deflateOrStore = zip.Deflate // 等于0时，表示启用压缩
 	}
 
 	// 创建 ZIP 文件
@@ -624,7 +643,7 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 			header.Name = headerName
 
 			// 设置压缩方法为 Deflate
-			header.Method = zip.Deflate
+			header.Method = deflateOrStore
 
 			// 创建 ZIP 写入器
 			fileWriter, err := zipWriter.CreateHeader(header)
@@ -667,11 +686,6 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 				return fmt.Errorf("创建 ZIP 目录失败: %w", err)
 			}
 
-			// 更新进度条
-			if err := bar.Add64(int64(1)); err != nil {
-				return fmt.Errorf("更新进度条失败: %w", err)
-			}
-
 		case mode&os.ModeSymlink != 0:
 			// 软链接
 			target, err := os.Readlink(path)
@@ -696,11 +710,6 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 				return fmt.Errorf("写入软链接目标失败: %w", err)
 			}
 
-			// 更新进度条
-			if err := bar.Add64(int64(1)); err != nil {
-				return fmt.Errorf("更新进度条失败: %w", err)
-			}
-
 		case mode&os.ModeDevice != 0:
 			// 设备文件
 			header := &zip.FileHeader{
@@ -718,11 +727,6 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 			// 设备文件通常不包含数据，只记录其元数据
 			if _, err := writer.Write([]byte{}); err != nil {
 				return fmt.Errorf("写入设备文件失败: %w", err)
-			}
-
-			// 更新进度条
-			if err := bar.Add64(int64(1)); err != nil {
-				return fmt.Errorf("更新进度条失败: %w", err)
 			}
 
 		default:
@@ -744,10 +748,6 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 				return fmt.Errorf("写入特殊文件失败: %w", err)
 			}
 
-			// 更新进度条
-			if err := bar.Add64(int64(1)); err != nil {
-				return fmt.Errorf("更新进度条失败: %w", err)
-			}
 		}
 
 		return nil
@@ -766,7 +766,13 @@ func CreateZip(zipFilePath string, sourceDir string) error {
 	return nil
 }
 
-// 解压缩 ZIP 文件到指定目录
+// Unzip 解压缩 ZIP 文件到指定目录
+// 参数:
+//   - zipFilePath: 要解压缩的 ZIP 文件路径
+//   - targetDir: 解压缩后的目标目录路径
+//
+// 返回值:
+//   - error: 解压缩过程中发生的错误
 func Unzip(zipFilePath string, targetDir string) error {
 	// 打开 ZIP 文件
 	zipReader, err := zip.OpenReader(zipFilePath)
@@ -799,35 +805,56 @@ func Unzip(zipFilePath string, targetDir string) error {
 		// 获取目标路径
 		targetPath := filepath.Join(targetDir, file.Name)
 
-		// 创建目录（如果需要）
-		if file.FileInfo().IsDir() {
-			if err := os.MkdirAll(targetPath, file.Mode()); err != nil {
+		// 获取文件的模式
+		mode := file.Mode()
+
+		// 使用 switch 语句处理不同类型的文件
+		switch {
+		case mode.IsDir():
+			// 目录
+			if err := os.MkdirAll(targetPath, mode.Perm()); err != nil {
 				return fmt.Errorf("创建目录失败: %w", err)
 			}
-			continue
-		}
+		case mode&os.ModeSymlink != 0:
+			// 软链接
+			zipFileReader, err := file.Open()
+			if err != nil {
+				return fmt.Errorf("打开 ZIP 文件中的软链接失败: %w", err)
+			}
+			defer zipFileReader.Close()
 
-		// 创建文件
-		fileWriter, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
-		if err != nil {
-			return fmt.Errorf("创建文件失败: %w", err)
-		}
-		defer fileWriter.Close()
+			var target string
+			// 读取软链接的目标路径
+			if _, err := fmt.Fscanln(zipFileReader, &target); err != nil {
+				return fmt.Errorf("读取软链接目标失败: %w", err)
+			}
 
-		// 打开 ZIP 文件中的文件
-		zipFileReader, err := file.Open()
-		if err != nil {
-			return fmt.Errorf("打开 ZIP 文件中的文件失败: %w", err)
-		}
-		defer zipFileReader.Close()
+			// 创建软链接
+			if err := os.Symlink(target, targetPath); err != nil {
+				return fmt.Errorf("创建软链接失败: %w", err)
+			}
+		default:
+			// 普通文件
+			fileWriter, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode.Perm())
+			if err != nil {
+				return fmt.Errorf("创建文件失败: %w", err)
+			}
+			defer fileWriter.Close()
 
-		// 自定义写入器，用于更新进度条
-		progressWriter := io.MultiWriter(fileWriter, bar) // bar 是一个全局的进度条对象
+			zipFileReader, err := file.Open()
+			if err != nil {
+				return fmt.Errorf("打开 ZIP 文件中的文件失败: %w", err)
+			}
+			defer zipFileReader.Close()
 
-		// 使用 io.CopyBuffer 并指定缓冲区大小
-		buffer := make([]byte, 1024*1024) // 1MB 缓冲区
-		if _, err := io.CopyBuffer(progressWriter, zipFileReader, buffer); err != nil {
-			return fmt.Errorf("写入 ZIP 文件失败: %w", err)
+			// 自定义写入器，用于更新进度条
+			progressWriter := io.MultiWriter(fileWriter, bar) // bar 是一个全局的进度条对象
+
+			// 使用 io.CopyBuffer 并指定缓冲区大小
+			buffer := make([]byte, 1024*1024) // 1MB 缓冲区
+			if _, err := io.CopyBuffer(progressWriter, zipFileReader, buffer); err != nil {
+				return fmt.Errorf("写入文件失败: %w", err)
+			}
 		}
 	}
 
