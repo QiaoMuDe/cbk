@@ -18,25 +18,30 @@ func deleteCmdMain(db *sqlx.DB) error {
 
 	// 检查是否同时指定了任务ID和任务名
 	if *deleteID != 0 && *deleteName != "" {
-		return fmt.Errorf("不能同时指定任务ID和任务名")
+		return fmt.Errorf("不能同时使用-id和-n参数, 请选择其中一种方式指定任务")
 	}
 
 	// 检查是否没有指定任务ID和任务名
 	if *deleteName == "" && *deleteID == 0 {
-		return fmt.Errorf("删除任务时, 必须指定任务名或任务ID")
+		return fmt.Errorf("必须指定要删除的任务, 请使用-id指定任务ID或-n指定任务名称")
 	}
 
 	// 共用的删除备份目录逻辑
 	deleteBackupDir := func(backupDir string) error {
+		// 检查是否设置了删除目录标志(*deleteDirF)
 		if *deleteDirF {
+			// 检查备份目录是否存在
 			if _, err := tools.CheckPath(backupDir); err == nil {
+				// 如果存在则删除整个目录
 				if err := os.RemoveAll(backupDir); err != nil {
 					return fmt.Errorf("删除备份存放目录失败: %w", err)
 				}
+				// 删除成功提示
 				CL.PrintOkf("备份存放目录删除成功: %s", backupDir)
-			} else {
-				CL.PrintWarnf("请在稍后，手动删除备份存放目录: %s", backupDir)
 			}
+		} else {
+			// 没有设置删除标志时的提示
+			CL.PrintWarnf("注意: 备份目录 %s 未被删除，请在删除任务后手动清理，或下次使用 -d 参数自动删除", backupDir)
 		}
 		return nil
 	}
