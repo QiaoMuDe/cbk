@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cbk/pkg/globals"
 	"cbk/pkg/tools"
 	"database/sql"
 	"fmt"
@@ -26,7 +27,7 @@ func unpackCmdMain(db *sqlx.DB) error {
 
 	// 检查*unpackID是否是已存在的
 	var taskCount int
-	if err := db.Get(&taskCount, "SELECT COUNT(*) FROM backup_records WHERE task_id = ? AND data_status = '1';", *unpackID); err == sql.ErrNoRows {
+	if err := db.Get(&taskCount, "SELECT COUNT(*) FROM backup_records WHERE task_id = ?;", *unpackID); err == sql.ErrNoRows {
 		return fmt.Errorf("未找到指定任务ID %d 的备份记录", *unpackID)
 	} else if err != nil {
 		return fmt.Errorf("查询备份记录失败: %w", err)
@@ -36,7 +37,7 @@ func unpackCmdMain(db *sqlx.DB) error {
 
 	// 检查versionID是否是已存在的
 	var versionCount int
-	if err := db.Get(&versionCount, "SELECT COUNT(*) FROM backup_records WHERE version_id = ? AND data_status = '1';", *unpackVersionID); err == sql.ErrNoRows {
+	if err := db.Get(&versionCount, "SELECT COUNT(*) FROM backup_records WHERE version_id = ?;", *unpackVersionID); err == sql.ErrNoRows {
 		return fmt.Errorf("未找到指定版本ID %s 的备份记录", *unpackVersionID)
 	} else if err != nil {
 		return fmt.Errorf("查询备份记录失败: %w", err)
@@ -45,16 +46,10 @@ func unpackCmdMain(db *sqlx.DB) error {
 	}
 
 	// 构建查询sql语句
-	querySql := "SELECT version_id, task_id, backup_file_name, backup_path, version_hash FROM backup_records WHERE task_id =? AND version_id =? AND data_status = '1';"
+	querySql := "SELECT version_id, task_id, backup_file_name, backup_path, version_hash FROM backup_records WHERE task_id =? AND version_id =?;"
 
 	// 定义存储查询结果的结构体
-	var record struct {
-		VersionID      string `db:"version_id"`       // 版本ID
-		TaskID         int    `db:"task_id"`          // 任务ID
-		BackupFileName string `db:"backup_file_name"` // 备份文件名
-		BackupPath     string `db:"backup_path"`      // 存放路径
-		VersionHash    string `db:"version_hash"`     // 版本哈希
-	}
+	var record globals.BackupRecord
 
 	// 执行查询
 	if err := db.Get(&record, querySql, *unpackID, *unpackVersionID); err == sql.ErrNoRows {

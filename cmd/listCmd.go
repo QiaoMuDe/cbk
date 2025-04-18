@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cbk/pkg/globals"
 	"fmt"
 	"os"
 
@@ -14,15 +15,8 @@ func listCmdMain(db *sqlx.DB) error {
 	// 查询所有任务
 	querySql := "SELECT task_id, task_name, target_directory, backup_directory, retention_count, no_compression FROM backup_tasks;"
 
-	// 定义任务列表结构体
-	var tasks []struct {
-		TaskID          int    `db:"task_id"`          // 任务ID
-		TaskName        string `db:"task_name"`        // 任务名
-		TargetDirectory string `db:"target_directory"` // 目标目录
-		BackupDirectory string `db:"backup_directory"` // 备份目录
-		RetentionCount  int    `db:"retention_count"`  // 保留数量
-		NoCompression   int    `db:"no_compression"`   // 是否禁用压缩(默认启用压缩, 0 表示启用压缩, 1 表示禁用压缩)
-	}
+	// 定义存储查询结果的结构体
+	var tasks globals.BackupTasks
 
 	// 查询任务列表
 	if err := db.Select(&tasks, querySql); err != nil {

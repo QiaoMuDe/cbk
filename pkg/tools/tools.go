@@ -436,12 +436,12 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 			return fmt.Errorf("文件名格式不正确，无法解析出足够的部分: %s", filePath)
 		}
 
-		// 构建更新sql
-		updateSql := `update backup_records set data_status =? where task_name =? and timestamp =?;`
+		// 构建删除sql
+		deleteSql := `delete from backup_records where task_name = ? and timestamp = ?;`
 
-		// 执行更新sql
-		if _, err := db.Exec(updateSql, "0", nameParts[0], nameParts[1]); err != nil {
-			return fmt.Errorf("更新备份记录时出错: %w", err)
+		// 执行删除操作
+		if _, err := db.Exec(deleteSql, nameParts[0], nameParts[1]); err != nil {
+			return fmt.Errorf("删除备份记录时出错: %w", err)
 		}
 	}
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cbk/pkg/globals"
 	"cbk/pkg/tools"
 	"database/sql"
 	"fmt"
@@ -18,11 +19,7 @@ func editCmdMain(db *sqlx.DB) error {
 
 	// 查询任务信息
 	editSql := "select task_name, retention_count,backup_directory from backup_tasks where task_id =?"
-	var task struct {
-		TaskName        string `db:"task_name"`        // 任务名
-		RetentionCount  int    `db:"retention_count"`  // 保留数量
-		BackupDirectory string `db:"backup_directory"` // 备份目录
-	}
+	var task globals.BackupTask
 	if err := db.Get(&task, editSql, *editID); err == sql.ErrNoRows {
 		return fmt.Errorf("任务ID不存在 %d", *editID)
 	} else if err != nil {

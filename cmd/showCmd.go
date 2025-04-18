@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cbk/pkg/globals"
 	"database/sql"
 	"fmt"
 	"os"
@@ -19,20 +20,10 @@ func showCmdMain(db *sqlx.DB) error {
 	}
 
 	// 构建查询sql语句
-	querySql := "SELECT version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash FROM backup_records WHERE task_id = ? AND data_status = '1' ORDER BY timestamp DESC"
+	querySql := "SELECT version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash FROM backup_records WHERE task_id = ? ORDER BY timestamp DESC"
 
 	// 定义存储查询结果的结构体
-	var records []struct {
-		VersionID      string `db:"version_id"`       // 版本ID
-		TaskID         int    `db:"task_id"`          // 任务ID
-		Timestamp      string `db:"timestamp"`        // 时间戳
-		TaskName       string `db:"task_name"`        // 任务名
-		BackupStatus   string `db:"backup_status"`    // 备份状态
-		BackupFileName string `db:"backup_file_name"` // 备份文件名
-		BackupSize     string `db:"backup_size"`      // 备份文件大小
-		BackupPath     string `db:"backup_path"`      // 备份文件路径
-		VersionHash    string `db:"version_hash"`     // 版本哈希
-	}
+	var records globals.BackupRecords
 
 	// 执行查询
 	if err := db.Select(&records, querySql, *showID); err == sql.ErrNoRows {
