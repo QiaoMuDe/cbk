@@ -369,10 +369,21 @@ func GetZipFiles(dirPath, FileExtension string) ([]string, error) {
 }
 
 // SortFilesByModTime 按照文件的最后修改时间对文件列表进行排序
-func SortFilesByModTime(files []FileWithModTime) []FileWithModTime {
+// ascending: true 表示旧文件在前(升序)，false 表示新文件在前(降序)
+func SortFilesByModTime(files []FileWithModTime, ascending bool) []FileWithModTime {
+	// 检查文件列表是否为空
+	if len(files) == 0 {
+		return files
+	}
+
+	// 对文件列表按照最后修改时间进行排序
 	sort.Slice(files, func(i, j int) bool {
-		return files[i].ModTime.Before(files[j].ModTime)
+		if ascending {
+			return files[i].ModTime.Before(files[j].ModTime) // 升序: 旧文件在前
+		}
+		return files[i].ModTime.After(files[j].ModTime) // 降序: 新文件在前
 	})
+
 	return files
 }
 
@@ -386,46 +397,123 @@ func SortFilesByModTime(files []FileWithModTime) []FileWithModTime {
 // 返回值：
 //
 //	error - 如果发生错误，返回错误信息；否则返回 nil
-func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
-	// 确保保留数量大于0
-	defer func() {
-		if r := recover(); r != nil {
-			CL.PrintErr("从崩溃中恢复:", r)
-		}
-	}()
-
+func RetainLatestFiles(db *sqlx.DB, files []string, retainCount, retainDays int) error {
 	// 用于存储文件及其最后修改时间
 	var fileInfos []FileWithModTime
 
-	// 获取每个文件的最后修改时间
-	for _, filePath := range files {
-		info, err := os.Stat(filePath)
-		if os.IsNotExist(err) {
-			CL.PrintErrf("文件不存在，跳过: %s", filePath)
-			continue
-		} else if err != nil {
-			return fmt.Errorf("获取文件信息时出错: %w", err)
-		}
-		fileInfos = append(fileInfos, FileWithModTime{Path: filePath, ModTime: info.ModTime()})
-	}
-
-	// 按照文件的最后修改时间排序
-	fileInfos = SortFilesByModTime(fileInfos)
-
-	// 如果文件数量小于或等于保留数量，直接返回
-	if len(fileInfos) <= retainCount {
+	// 检查获取到的文件列表是否为空
+	if len(files) == 0 {
 		return nil
 	}
 
-	// 删除最早的文件，仅保留最新的指定数量的文件
-	for i := 0; i < len(fileInfos)-retainCount; i++ {
-		filePath := fileInfos[i].Path
-		if err := os.Remove(filePath); err != nil {
-			return fmt.Errorf("清理文件时出错: %w", err)
+	// 获取每个文件的最后修改时间
+	for _, filePath := range files {
+		// 获取文件信息
+		info, err := os.Stat(filePath)
+		// 检查文件是否存在
+		if os.IsNotExist(err) {
+			CL.PrintErrf("备份文件不存在, 跳过: %s", filePath)
+			continue
+		} else if err != nil {
+			CL.PrintErrf("获取文件信息时出错: %v", err)
+			continue
 		}
 
+		// 将文件路径和最后修改时间存储到 fileInfos 切片中
+		fileInfos = append(fileInfos, FileWithModTime{Path: filePath, ModTime: info.ModTime()})
+	}
+
+	// 按照文件的最后修改时间排序, 旧的在前面
+	fileInfos = SortFilesByModTime(fileInfos, true)
+
+	// 根据保留天数和保留数量筛选文件
+	filesToDelete := filterFiles(fileInfos, retainDays, retainCount)
+
+	// 按照筛选后的文件列表删除文件
+	if err := deleteFiles(db, filesToDelete); err != nil {
+		return fmt.Errorf("清理文件时出错: %w", err)
+	}
+
+	return nil
+}
+
+// filterFiles 根据保留天数和保留数量筛选文件
+// 参数：
+//
+//	files - 文件列表
+//	retainDays - 保留的天数
+//	retainCount - 保留的文件数量
+//
+// 返回值：
+//
+//	[]FileWithModTime - 筛选后的文件列表
+func filterFiles(files []FileWithModTime, retainDays, retainCount int) []FileWithModTime {
+	var filesToDelete []FileWithModTime
+
+	// 如果为空，直接返回
+	if len(files) == 0 {
+		return filesToDelete
+	}
+
+	// 仅设置保留数量，没有设置保留天数
+	if retainDays == 0 && retainCount > 0 {
+		// 保留最新的retainCount个文件, 如果文件数量大于retainCount, 则将从0到len(files)-retainCount的文件添加到filesToDelete中
+		if len(files) > retainCount {
+			filesToDelete = files[0 : len(files)-retainCount] // 从0到len(files)-retainCount的文件添加到filesToDelete中
+		}
+
+		return filesToDelete
+	}
+
+	// 同时设置保留天数和保留数量
+	if retainDays > 0 && retainCount > 0 {
+		// 先按天数筛选分组，然后在每天分组中保留最新的retainCount个文件
+		retainTime := time.Now().AddDate(0, 0, -retainDays)
+		dayMap := make(map[time.Time][]FileWithModTime)
+
+		// 按天分组
+		for _, file := range files {
+			// 检查文件的最后修改时间是否在保留时间范围内
+			if file.ModTime.After(retainTime) {
+				// 将文件按天分组
+				day := time.Date(file.ModTime.Year(), file.ModTime.Month(), file.ModTime.Day(), 0, 0, 0, 0, file.ModTime.Location())
+				dayMap[day] = append(dayMap[day], file)
+			}
+		}
+
+		// 在每天分组中保留最新的retainCount个文件
+		for _, dayFiles := range dayMap {
+			// 检查每天分组的文件数量是否大于保留数量
+			if len(dayFiles) > retainCount {
+				// 如果大于保留数量，则将从0到len(dayFiles)-retainCount的文件添加到filesToDelete中
+				filesToDelete = append(filesToDelete, dayFiles[0:len(dayFiles)-retainCount]...)
+			}
+		}
+
+		return filesToDelete
+	}
+
+	// 返回空切片
+	return []FileWithModTime{}
+}
+
+// deleteFiles 根据文件列表删除文件
+// 参数：
+//
+//	db - 数据库连接
+//	files - 文件列表
+//
+// 返回值：
+//
+// error - 如果发生错误，返回错误信息；否则返回 nil
+func deleteFiles(db *sqlx.DB, files []FileWithModTime) error {
+	// 构建删除sql
+	deleteSql := `delete from backup_records where task_name = ? and timestamp = ?;`
+
+	// 遍历文件列表, 删除文件
+	for _, file := range files {
 		// 按小数点分割文件名，获取文件名称部分
-		baseName := filepath.Base(filePath) // 获取文件名（带扩展名）
+		baseName := filepath.Base(file.Path) // 获取文件名（带扩展名）
 		parts := strings.Split(baseName, ".")
 
 		// 按下划线分割文件名称部分，获取文件名称和扩展名部分
@@ -433,14 +521,22 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount int) error {
 
 		// 检查 nameParts 的长度是否足够
 		if len(nameParts) < 2 {
-			return fmt.Errorf("文件名格式不正确，无法解析出足够的部分: %s", filePath)
+			CL.PrintErrf("文件名格式不正确，无法解析出足够的部分: %s, 请在稍后手动删除", file.Path)
+			continue
+		} else {
+			// 检查文件是否存在, 如果存在, 则删除
+			if _, err := CheckPath(file.Path); err == nil {
+				if err := os.Remove(file.Path); err != nil {
+					CL.PrintErrf("清理 %s 文件时出错: %v, 请在稍后手动删除", file.Path, err)
+				}
+			}
 		}
 
-		// 构建删除sql
-		deleteSql := `delete from backup_records where task_name = ? and timestamp = ?;`
+		taskName := nameParts[0]  // 任务名称
+		timestamp := nameParts[1] // 时间戳
 
-		// 执行删除操作
-		if _, err := db.Exec(deleteSql, nameParts[0], nameParts[1]); err != nil {
+		// 执行删除操作sql, 参数: 任务名称, 时间戳
+		if _, err := db.Exec(deleteSql, taskName, timestamp); err != nil {
 			return fmt.Errorf("删除备份记录时出错: %w", err)
 		}
 	}
@@ -936,5 +1032,17 @@ func RenameBackupDirectory(rootPath, oldDirName, newDirName string) error {
 	}
 
 	CL.PrintOkf("备份目录重命名成功: %s", filepath.Join(rootPath, newDirName))
+	return nil
+}
+
+// EnsureDirExists 确保目录存在，如果不存在则创建目录
+// 参数：dir - 要检查的目录路径
+// 返回：error - 如果目录不存在且创建失败，返回错误信息；否则返回 nil
+func EnsureDirExists(dir string) error {
+	if _, err := CheckPath(dir); err != nil {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("目录创建失败: %w", err)
+		}
+	}
 	return nil
 }

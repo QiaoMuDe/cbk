@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cbk/pkg/globals"
 	"cbk/pkg/tools"
 	"fmt"
 	"os"
@@ -49,7 +50,7 @@ func addCmdMain(db *sqlx.DB) error {
 	}
 
 	// 扩展目标目录为绝对路径
-	AbsAddTarget, err := filepath.Abs(filepath.Clean(*addTarget))
+	absTargetDir, err := filepath.Abs(filepath.Clean(*addTarget))
 	if err != nil {
 		return fmt.Errorf("获取目标目录绝对路径失败: %w", err)
 	}
@@ -57,13 +58,14 @@ func addCmdMain(db *sqlx.DB) error {
 	// 如果备份目录名为空, 则获取目标目录的basename作为存放备份的目录名
 	var bakDirName string
 	if *addBackupDirName == "" {
-		bakDirName = filepath.Base(AbsAddTarget)
+		bakDirName = filepath.Base(absTargetDir)
 	} else {
 		// 使用指定的备份目录名
 		bakDirName = *addBackupDirName
 	}
 
 	// 如果备份目录为空, 则使用默认值路径，格式为: /home/username/.cbk/data/xxx
+	var absBackupDir string // 定义备份目录的绝对路径
 	if *addBackup == "" {
 		// 获取用户主目录
 		tempHome, err := os.UserHomeDir()
@@ -71,21 +73,19 @@ func addCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("获取用户主目录失败: %w", err)
 		}
 		// 构建备份目录的绝对路径, 格式为: /home/username/.cbk/data/bakDirName
-		*addBackup = filepath.Join(tempHome, ".cbk", "data", bakDirName)
+		absBackupDir = filepath.Join(tempHome, globals.CbkHomeDir, globals.CbkDataDir, bakDirName)
 
 		// 检查备份目录是否存在
-		if _, err := tools.CheckPath(*addBackup); err != nil {
-			if err := os.MkdirAll(*addBackup, 0755); err != nil {
-				return fmt.Errorf("备份目录创建失败: %w", err)
-			}
+		if err := tools.EnsureDirExists(absBackupDir); err != nil {
+			return fmt.Errorf("备份目录创建失败: %w", err)
 		}
 	} else {
-		// 检查备份目录是否存在
-		if _, err := tools.CheckPath(*addBackup); err != nil {
-			return fmt.Errorf("备份目录不存在: %w", err)
+		// 检查指定的备份目录是否存在并创建
+		if err := tools.EnsureDirExists(*addBackup); err != nil {
+			return fmt.Errorf("备份目录创建失败: %w", err)
 		}
 
-		// 检查备份目录是否为绝对路径
+		// 检查备份目录是否为绝对路径, 如果不是, 则转换为绝对路径
 		if !filepath.IsAbs(*addBackup) {
 			var err error
 			*addBackup, err = filepath.Abs(*addBackup)
@@ -95,13 +95,11 @@ func addCmdMain(db *sqlx.DB) error {
 		}
 
 		// 构建自定义备份目录的绝对路径, 格式为: /path/to/bakDirName
-		*addBackup = filepath.Join(*addBackup, bakDirName)
+		absBackupDir = filepath.Join(*addBackup, bakDirName)
 
-		// 检查备份目录是否存在
-		if _, err := tools.CheckPath(*addBackup); err != nil {
-			if err := os.MkdirAll(*addBackup, 0755); err != nil {
-				return fmt.Errorf("备份目录创建失败: %w", err)
-			}
+		// 检查备份目录是否存在并创建
+		if err := tools.EnsureDirExists(absBackupDir); err != nil {
+			return fmt.Errorf("备份目录创建失败: %w", err)
 		}
 	}
 
@@ -114,8 +112,8 @@ func addCmdMain(db *sqlx.DB) error {
 	}
 
 	// 插入新任务到数据库
-	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count, no_compression) values(?, ?, ?, ?, ?)"
-	if _, err := db.Exec(insertSql, *addName, AbsAddTarget, *addBackup, *addKeep, noCompression); err != nil {
+	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count, retention_days, no_compression) values(?, ?, ?, ?, ?, ?)"
+	if _, err := db.Exec(insertSql, *addName, absTargetDir, absBackupDir, *addRetentionCount, *addRetentionDays, noCompression); err != nil {
 		return fmt.Errorf("插入任务失败: %w", err)
 	}
 

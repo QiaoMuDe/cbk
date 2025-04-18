@@ -18,7 +18,7 @@ func editCmdMain(db *sqlx.DB) error {
 	}
 
 	// 查询任务信息
-	editSql := "select task_name, retention_count,backup_directory from backup_tasks where task_id =?"
+	editSql := "select task_name, retention_count,backup_directory, no_compression from backup_tasks where task_id =?"
 	var task globals.BackupTask
 	if err := db.Get(&task, editSql, *editID); err == sql.ErrNoRows {
 		return fmt.Errorf("任务ID不存在 %d", *editID)
@@ -31,9 +31,29 @@ func editCmdMain(db *sqlx.DB) error {
 		task.TaskName = *editName
 	}
 
-	// 如果指定了-k参数, 则更新保留数量
-	if *editKeep != 0 {
-		task.RetentionCount = *editKeep
+	// 如果指定了-c参数, 则更新保留数量
+	if *editRetentionCount != 0 {
+		task.RetentionCount = *editRetentionCount
+	}
+
+	// 如果指定了-d参数, 则更新保留天数
+	if *editRetentionDays != 0 { // 保留天数默认为0
+		task.RetentionDays = *editRetentionDays
+	}
+
+	// 如果指定了-nc参数, 则更新是否禁用压缩
+	if *editNoCompression != "" {
+		// 检查如果不是true或false则报错
+		if *editNoCompression != "true" && *editNoCompression != "false" {
+			return fmt.Errorf("参数 -nc 只能是 true 或 false")
+		}
+
+		// 根据参数值更新NoCompression字段
+		if *editNoCompression == "true" {
+			task.NoCompression = 1 // 1 表示禁用压缩
+		} else {
+			task.NoCompression = 0 // 0表示启用压缩
+		}
 	}
 
 	// 如果指定了-bn参数, 则更新备份目录
@@ -58,11 +78,11 @@ func editCmdMain(db *sqlx.DB) error {
 		task.BackupDirectory = filepath.Join(rootPath, newDirName)
 	}
 
-	// 更新任务事务
-	updateSql := "update backup_tasks set task_name = ?, retention_count = ? , backup_directory = ? where task_id = ?"
+	// 更新任务
+	updateSql := "update backup_tasks set task_name = ?, retention_count = ? , retention_days = ?, backup_directory = ?, no_compression = ? where task_id = ?"
 
 	// 更新任务SQL
-	if _, err := db.Exec(updateSql, task.TaskName, task.RetentionCount, task.BackupDirectory, *editID); err != nil {
+	if _, err := db.Exec(updateSql, task.TaskName, task.RetentionCount, task.RetentionDays, task.BackupDirectory, task.NoCompression, *editID); err != nil {
 		// 更新任务失败
 		if *editNewDirName != "" {
 			if err := tools.RenameBackupDirectory(rootPath, newDirName, oldDirName); err != nil {
@@ -78,11 +98,21 @@ func editCmdMain(db *sqlx.DB) error {
 	if *editName != "" {
 		CL.PrintOkf("任务ID %d 的任务名已更新为: %s", *editID, task.TaskName)
 	}
-	if *editKeep != 0 {
+	if *editRetentionCount != 0 {
 		CL.PrintOkf("任务ID %d 的保留数量已更新为: %d", *editID, task.RetentionCount)
+	}
+	if *editRetentionDays != 0 {
+		CL.PrintOkf("任务ID %d 的保留天数已更新为: %d", *editID, task.RetentionDays)
 	}
 	if *editNewDirName != "" {
 		CL.PrintOkf("任务ID %d 的备份目录已更新为: %s", *editID, task.BackupDirectory)
+	}
+	if *editNoCompression != "" {
+		if task.NoCompression == 1 {
+			CL.PrintOkf("任务ID %d 的压缩状态已更新为: 禁用", *editID)
+		} else {
+			CL.PrintOkf("任务ID %d 的压缩状态已更新为: 启用", *editID)
+		}
 	}
 
 	return nil

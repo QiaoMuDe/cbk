@@ -18,6 +18,7 @@ type BackupTask struct {
 	TargetDirectory string `db:"target_directory"` // 目标目录
 	BackupDirectory string `db:"backup_directory"` // 备份目录
 	RetentionCount  int    `db:"retention_count"`  // 保留数量
+	RetentionDays   int    `db:"retention_days"`   // 保留天数
 	NoCompression   int    `db:"no_compression"`   // 是否禁用压缩(默认启用压缩, 0 表示启用压缩, 1 表示禁用压缩)
 }
 

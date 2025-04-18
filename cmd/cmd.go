@@ -88,15 +88,17 @@ var (
 	// 子命令: run
 	runCmd = flag.NewFlagSet("run", flag.ExitOnError)
 	runID  = runCmd.Int("id", 0, "任务ID")
+	runIDs = runCmd.String("ids", "", "任务ID列表, 多个ID用管道符分隔")
 
 	// 子命令: add
-	addCmd           = flag.NewFlagSet("add", flag.ExitOnError)
-	addName          = addCmd.String("n", "", "任务名")
-	addTarget        = addCmd.String("t", "", "目标目录路径")
-	addBackup        = addCmd.String("b", "", "备份存放路径(默认: 用户主目录/.cbk/[项目名]/")
-	addKeep          = addCmd.Int("k", 3, "保留数量")
-	addBackupDirName = addCmd.String("bn", "", "备份目录名(默认: 目标目录名)")
-	addNoCompression = addCmd.Bool("nc", false, "是否禁用压缩（默认启用压缩）")
+	addCmd            = flag.NewFlagSet("add", flag.ExitOnError)
+	addName           = addCmd.String("n", "", "任务名")
+	addTarget         = addCmd.String("t", "", "目标目录路径")
+	addBackup         = addCmd.String("b", "", "备份存放路径(默认: 用户主目录/.cbk/[项目名]/")
+	addRetentionCount = addCmd.Int("c", 3, "保留数量")
+	addRetentionDays  = addCmd.Int("d", 0, "保留天数")
+	addBackupDirName  = addCmd.String("bn", "", "备份目录名(默认: 目标目录名)")
+	addNoCompression  = addCmd.Bool("nc", false, "是否禁用压缩（默认启用压缩）")
 
 	// 子命令: delete
 	deleteCmd       = flag.NewFlagSet("delete", flag.ExitOnError)
@@ -106,11 +108,13 @@ var (
 	deleteVersionID = deleteCmd.String("v", "", "指定要删除的备份版本ID")
 
 	// 子命令: edit
-	editCmd        = flag.NewFlagSet("edit", flag.ExitOnError)
-	editName       = editCmd.String("n", "", "指定新的任务名。如果未指定，则任务名保持不变")
-	editID         = editCmd.Int("id", 0, "指定要编辑的备份任务ID")
-	editKeep       = editCmd.Int("k", 3, "指定备份文件的保留数量。如果未指定，则保留数量保持不变")
-	editNewDirName = editCmd.String("bn", "", "指定新的备份目录名。如果未指定，则备份目录名保持不变")
+	editCmd            = flag.NewFlagSet("edit", flag.ExitOnError)
+	editName           = editCmd.String("n", "", "指定新的任务名。如果未指定，则任务名保持不变")
+	editID             = editCmd.Int("id", 0, "指定要编辑的备份任务ID")
+	editRetentionCount = editCmd.Int("c", 3, "指定备份文件的保留数量。如果未指定，则保留数量保持不变")
+	editRetentionDays  = editCmd.Int("d", 0, "指定备份文件的保留天数。如果未指定，则保留天数保持不变")
+	editNewDirName     = editCmd.String("bn", "", "指定新的备份目录名。如果未指定，则备份目录名保持不变")
+	editNoCompression  = editCmd.String("nc", "", "是否禁用压缩")
 
 	// 子命令: log
 	logCmd          = flag.NewFlagSet("log", flag.ExitOnError)
