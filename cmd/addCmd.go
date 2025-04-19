@@ -27,13 +27,13 @@ func addCmdMain(db *sqlx.DB) error {
 		}
 
 		// 解析配置文件
-		var addTaskConfig globals.Task
-		if err := yaml.Unmarshal(config, addTaskConfig); err != nil {
+		var addTaskConfig globals.TaskConfig
+		if err := yaml.Unmarshal(config, &addTaskConfig); err != nil {
 			return fmt.Errorf("解析 %s 配置文件失败: %w", *addConfig, err)
 		}
 
 		// 添加任务
-		if err := addTask(db, addTaskConfig.Name, addTaskConfig.Target, addTaskConfig.Backup, addTaskConfig.BackupDirName, addTaskConfig.Retention.Count, addTaskConfig.Retention.Days, addTaskConfig.NoCompression); err != nil {
+		if err := addTask(db, addTaskConfig.Task.Name, addTaskConfig.Task.Target, addTaskConfig.Task.Backup, addTaskConfig.Task.BackupDirName, addTaskConfig.Task.Retention.Count, addTaskConfig.Task.Retention.Days, addTaskConfig.Task.NoCompression); err != nil {
 			return fmt.Errorf("添加任务失败: %w", err)
 		}
 

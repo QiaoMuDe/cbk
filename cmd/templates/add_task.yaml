@@ -1,8 +1,8 @@
 # add_task.yaml
 task:
   name: "example_task" # 任务名
-  target: "/path/to/target/directory" # 目标目录路径
-  backup: "/path/to/backup/directory" # 备份存放路径
+  target: "/path/to/target/directory" # 目标目录路径(路径请用单引号防止yaml解析错误)
+  backup: "/path/to/backup/directory" # 备份存放路径(路径请用单引号防止yaml解析错误)
   retention:
     count: 3 # 保留数量
     days: 7 # 保留天数(配置为0时禁用)

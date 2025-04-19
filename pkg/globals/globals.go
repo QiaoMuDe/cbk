@@ -41,6 +41,11 @@ type BackupRecord struct {
 // 定义备份记录表结构体切片
 type BackupRecords []BackupRecord
 
+// 定义任务配置的结构体
+type TaskConfig struct {
+	Task Task `yaml:"task"`
+}
+
 // 定义任务的结构体
 type Task struct {
 	Name          string    `yaml:"name"`            // 任务名
