@@ -8,6 +8,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/schollz/progressbar/v3 v3.18.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

@@ -85,7 +85,7 @@ func runTask(db *sqlx.DB, ids []int) error {
 	var task globals.BackupTask
 
 	// 构建查询任务信息的SQL语句
-	querySql := "select task_name, target_directory, backup_directory, retention_count, no_compression from backup_tasks where task_id =?"
+	querySql := "select task_name, target_directory, backup_directory, retention_count, retention_days, no_compression from backup_tasks where task_id =?"
 
 	// 构建失败记录的SQL语句
 	errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"

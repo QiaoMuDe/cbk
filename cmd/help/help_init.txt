@@ -1,0 +1,21 @@
+用法：cbk init -type <类型>
+
+描述：
+  生成指定的配置模板。
+
+参数：
+  -type <类型>                必需。指定要生成的配置模板类型。可选值：bash, addtask。
+
+示例：
+  cbk init -type bash
+  为当前命令行工具生成 bash 类型的自动补全脚本。
+
+  source <(cbk init -type bash)
+  为当前命令行工具安装 bash 类型的自动补全脚本。可以保存在~/.bashrc 文件中，以便在每次打开终端时自动加载。
+  
+  cbk init -type addtask
+  在当前目录下生成用于通过配置文件添加任务的add_task.yaml模板文件。
+
+注意:
+  -type <类型>参数的值必须与命令行工具名称相同。
+  可以将生成的脚本保存到文件中，然后使用 source 命令加载到当前会话中。 

@@ -15,7 +15,7 @@ _cbk() {
     prev="${COMP_WORDS[COMP_CWORD - 1]}"
 
     # 定义所有可用的子命令和选项
-    opts="list run add delete edit log show unpack zip unzip uz clear complete version help --help -h -v -vv"
+    opts="list run add delete edit log show unpack zip unzip uz clear init version help --help -h -v -vv"
 
     # 根据前一个单词(prev)来决定补全的内容
     case "${prev}" in
@@ -26,13 +26,13 @@ _cbk() {
         ;;
     add)
         # 如果前一个单词是 add, 补全 add 命令的选项
-        sub_opts="-n -t -b -c -d -bn -h -nc"
+        sub_opts="-n -t -b -c -d -bn -h -nc -f"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
     a)
         # 如果前一个单词是 a, 补全 a 命令的选项
-        sub_opts="-n -t -b -c -d -bn -h -nc"
+        sub_opts="-n -t -b -c -d -bn -h -nc -f"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
@@ -144,8 +144,8 @@ _cbk() {
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
-    complete)
-        # 如果前一个单词是 complete, 补全 complete 命令的选项
+    init)
+        # 如果前一个单词是 init, 补全 init 命令的选项
         sub_opts="-type -h"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
@@ -171,10 +171,10 @@ _cbk() {
         return 0
     fi
 
-    # 如果前一个单词是 -type, 补全补全类型
+    # 如果前一个单词是 -type, 补全类型
     if [[ ${prev} == "-type" ]] || [[ ${prev} == "--type" ]]; then
-        # 定义所有可用的补全类型
-        local completion_types="bash"
+        # 定义所有可用的类型
+        local completion_types="bash addtask"
         COMPREPLY=($(compgen -W "${completion_types}" -- ${cur}))
         return 0
     fi
@@ -200,8 +200,8 @@ _cbk() {
         return 0
     fi
 
-    # 如果前一个单词是-k, 则补全推荐的保留数
-    if [[ ${prev} == "-k" ]]; then
+    # 如果前一个单词是-c, 则补全推荐的保留数
+    if [[ ${prev} == "-c" ]]; then
         sub_opts="1 3 5 7 9 12"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0

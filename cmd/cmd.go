@@ -71,11 +71,14 @@ var HelpUnpackText string // 定义子命令: unpack的帮助文本
 //go:embed help/help_clear.txt
 var HelpClearText string // 定义子命令: clear的帮助文本
 
-//go:embed help/help_complete.txt
-var HelpCompleteText string // 定义子命令: complete的帮助文本
+//go:embed help/help_init.txt
+var HelpInitText string // 定义子命令: init的帮助文本
 
 //go:embed autocomplete/bash/cbk.sh
 var BashCompletion string // 定义bash补全脚本
+
+//go:embed templates/add_task.yaml
+var AddTaskTemplate string // 定义添加任务的模板文件
 
 // 定义子命令及其参数
 var (
@@ -94,11 +97,12 @@ var (
 	addCmd            = flag.NewFlagSet("add", flag.ExitOnError)
 	addName           = addCmd.String("n", "", "任务名")
 	addTarget         = addCmd.String("t", "", "目标目录路径")
-	addBackup         = addCmd.String("b", "", "备份存放路径(默认: 用户主目录/.cbk/[项目名]/")
+	addBackup         = addCmd.String("b", "", "备份存放路径(默认: 用户主目录/.cbk/data/[项目名]/")
 	addRetentionCount = addCmd.Int("c", 3, "保留数量")
 	addRetentionDays  = addCmd.Int("d", 0, "保留天数")
 	addBackupDirName  = addCmd.String("bn", "", "备份目录名(默认: 目标目录名)")
 	addNoCompression  = addCmd.Bool("nc", false, "是否禁用压缩（默认启用压缩）")
+	addConfig         = addCmd.String("f", "", "指定YAML格式的配置文件路径, 用于批量添加任务(格式参考: add_task.yaml)")
 
 	// 子命令: delete
 	deleteCmd       = flag.NewFlagSet("delete", flag.ExitOnError)
@@ -159,9 +163,9 @@ var (
 	clearCmd     = flag.NewFlagSet("clear", flag.ExitOnError)
 	clearConfirm = clearCmd.Bool("confirm", false, "确认是否执行清空数据操作")
 
-	// 子命令: complete
-	completeCmd  = flag.NewFlagSet("complete", flag.ExitOnError)
-	completeType = completeCmd.String("type", "", "指定要生成的自动补全脚本的类型。可选值: bash, powershell")
+	// 子命令: init
+	initCmd  = flag.NewFlagSet("complete", flag.ExitOnError)
+	initType = initCmd.String("type", "", "指定要生成的配置类型, 可选值: bash, addtask")
 )
 
 func init() {
@@ -231,9 +235,9 @@ func init() {
 		os.Exit(0)
 	}
 
-	// 初始化complete命令的帮助信息
-	completeCmd.Usage = func() {
-		fmt.Println(HelpCompleteText)
+	// 初始化init命令的帮助信息
+	initCmd.Usage = func() {
+		fmt.Println(HelpInitText)
 		os.Exit(0)
 	}
 }
@@ -473,15 +477,15 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("清空数据库失败: %v", err)
 		}
 		return nil
-	case "complete":
-		// 解析complete命令的参数
-		if err := completeCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析complete命令参数失败: %v", err)
+	case "init":
+		// 解析init命令的参数
+		if err := initCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析init命令参数失败: %v", err)
 		}
 
-		// 执行complete命令的逻辑
-		if err := completeCmdMain(*completeType); err != nil {
-			return fmt.Errorf("生成自动补全脚本失败: %v", err)
+		// 执行init命令的逻辑
+		if err := initCmdMain(*initType); err != nil {
+			return fmt.Errorf("生成文件失败: %v", err)
 		}
 		return nil
 	// 未知命令

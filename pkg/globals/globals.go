@@ -40,3 +40,19 @@ type BackupRecord struct {
 
 // 定义备份记录表结构体切片
 type BackupRecords []BackupRecord
+
+// 定义任务的结构体
+type Task struct {
+	Name          string    `yaml:"name"`            // 任务名
+	Target        string    `yaml:"target"`          // 目标目录
+	Backup        string    `yaml:"backup"`          // 备份目录
+	Retention     Retention `yaml:"retention"`       // 保留策略
+	BackupDirName string    `yaml:"backup_dir_name"` // 备份目录名
+	NoCompression bool      `yaml:"no_compression"`  // 是否禁用压缩(默认启用压缩, 0 表示启用压缩, 1 表示禁用压缩)
+}
+
+// 定义保留策略的结构体
+type Retention struct {
+	Count int `yaml:"count"` // 保留数量
+	Days  int `yaml:"days"`  // 保留天数(配置为 0 表示不限制天数)
+}
