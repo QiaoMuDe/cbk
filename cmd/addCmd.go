@@ -164,7 +164,7 @@ func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, b
 
 	// 插入新任务到数据库
 	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count, retention_days, no_compression, exclude_rules) values(?, ?, ?, ?, ?, ?, ?)"
-	if _, err := db.Exec(insertSql, taskName, absTargetDir, absBackupDir, retentionCount, retentionDays, *addNoCompression, excludeRules); err != nil {
+	if _, err := db.Exec(insertSql, taskName, absTargetDir, absBackupDir, retentionCount, retentionDays, noCompression, excludeRules); err != nil {
 		return fmt.Errorf("插入任务失败: %w", err)
 	}
 
