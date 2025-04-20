@@ -24,7 +24,7 @@ func editCmdMain(db *sqlx.DB) error {
 	}
 
 	// 查询任务信息
-	editSql := "select task_name, retention_count, retention_days, backup_directory, no_compression from backup_tasks where task_id =?"
+	editSql := "select task_name, retention_count, retention_days, backup_directory, no_compression, exclude_rules from backup_tasks where task_id =?"
 	var task globals.BackupTask
 	if err := db.Get(&task, editSql, *editID); err == sql.ErrNoRows {
 		return fmt.Errorf("任务ID不存在 %d", *editID)
