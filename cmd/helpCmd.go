@@ -44,6 +44,9 @@ func helpCmdMain(cmd string) error {
 	case "init":
 		fmt.Println(HelpInitText)
 		return nil
+	case "export":
+		fmt.Println(HelpExportText)
+		return nil
 	default:
 		return fmt.Errorf("未知命令: %s", cmd)
 	}

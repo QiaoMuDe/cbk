@@ -18,7 +18,7 @@ func editCmdMain(db *sqlx.DB) error {
 	}
 
 	// 检查所有的参数是否都没指定
-	if *editName == "" && *editRetentionCount == -1 && *editRetentionDays == -1 && *editNoCompression == -1 && *editNewDirName == "" {
+	if *editName == "" && *editRetentionCount == -1 && *editRetentionDays == -1 && *editNoCompression == -1 && *editNewDirName == "" && *editExcludeRules == "" {
 		CL.PrintWarn("未指定任何参数, 任务将不会被修改")
 		return nil
 	}
@@ -80,11 +80,16 @@ func editCmdMain(db *sqlx.DB) error {
 		task.BackupDirectory = filepath.Join(rootPath, newDirName)
 	}
 
+	// 如果指定了-ex参数, 则更新排除规则
+	if *editExcludeRules != "" {
+		task.ExcludeRules = *editExcludeRules
+	}
+
 	// 更新任务
-	updateSql := "update backup_tasks set task_name = ?, retention_count = ? , retention_days = ?, backup_directory = ?, no_compression = ? where task_id = ?"
+	updateSql := "update backup_tasks set task_name = ?, retention_count = ? , retention_days = ?, backup_directory = ?, no_compression = ?, exclude_rules = ? where task_id = ?"
 
 	// 更新任务SQL
-	if _, err := db.Exec(updateSql, task.TaskName, task.RetentionCount, task.RetentionDays, task.BackupDirectory, task.NoCompression, *editID); err != nil {
+	if _, err := db.Exec(updateSql, task.TaskName, task.RetentionCount, task.RetentionDays, task.BackupDirectory, task.NoCompression, task.ExcludeRules, *editID); err != nil {
 		// 更新任务失败
 		if *editNewDirName != "" {
 			if err := tools.RenameBackupDirectory(rootPath, newDirName, oldDirName); err != nil {
@@ -115,6 +120,9 @@ func editCmdMain(db *sqlx.DB) error {
 		} else {
 			CL.PrintOkf("任务ID %d 的压缩状态已更新为: 启用", *editID)
 		}
+	}
+	if *editExcludeRules != "" {
+		CL.PrintOkf("任务ID %d 的排除规则已更新为: %s", *editID, task.ExcludeRules)
 	}
 
 	return nil

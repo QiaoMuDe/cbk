@@ -80,6 +80,9 @@ var BashCompletion string // 定义bash补全脚本
 //go:embed templates/add_task.yaml
 var AddTaskTemplate string // 定义添加任务的模板文件
 
+//go:embed help/help_export.txt
+var HelpExportText string // 定义子命令: export的帮助文本
+
 // 定义子命令及其参数
 var (
 	// 子命令: list
@@ -120,7 +123,7 @@ var (
 	editRetentionDays  = editCmd.Int("d", -1, "指定备份文件的保留天数。如果未指定，则保留天数保持不变")
 	editNewDirName     = editCmd.String("bn", "", "指定新的备份目录名。如果未指定，则备份目录名保持不变")
 	editNoCompression  = editCmd.Int("nc", -1, "是否禁用压缩(0: 启用压缩, 1: 禁用压缩, -1: 不修改)")
-	//editExcludeRules   = editCmd.String("ex", "none", "指定要排除的目录名、文件名、扩展名, 用于排除备份文件, 支持通配符模式")
+	editExcludeRules   = editCmd.String("ex", "", "指定要排除的目录名、文件名、扩展名, 用于排除备份文件, 支持通配符模式")
 
 	// 子命令: log
 	logCmd          = flag.NewFlagSet("log", flag.ExitOnError)
@@ -169,6 +172,11 @@ var (
 	// 子命令: init
 	initCmd  = flag.NewFlagSet("complete", flag.ExitOnError)
 	initType = initCmd.String("type", "", "指定要生成的配置类型, 可选值: bash, addtask")
+
+	// 子命令: export
+	exportCmd = flag.NewFlagSet("export", flag.ExitOnError)
+	exportID  = exportCmd.Int("id", 0, "指定要导出的任务ID")
+	exportAll = exportCmd.Bool("all", false, "导出所有任务")
 )
 
 func init() {
@@ -241,6 +249,12 @@ func init() {
 	// 初始化init命令的帮助信息
 	initCmd.Usage = func() {
 		fmt.Println(HelpInitText)
+		os.Exit(0)
+	}
+
+	// 初始化export命令的帮助信息
+	exportCmd.Usage = func() {
+		fmt.Println(HelpExportText)
 		os.Exit(0)
 	}
 }
@@ -489,6 +503,16 @@ func ExecuteCommands(db *sqlx.DB, args []string) error {
 		// 执行init命令的逻辑
 		if err := initCmdMain(*initType); err != nil {
 			return fmt.Errorf("生成文件失败: %v", err)
+		}
+		return nil
+	case "export":
+		// 解析export命令的参数
+		if err := exportCmd.Parse(args[1:]); err != nil {
+			return fmt.Errorf("解析export命令参数失败: %v", err)
+		}
+		// 执行export命令的逻辑
+		if err := exportCmdMain(db); err != nil {
+			return fmt.Errorf("导出数据库失败: %v", err)
 		}
 		return nil
 	// 未知命令

@@ -15,7 +15,7 @@ _cbk() {
     prev="${COMP_WORDS[COMP_CWORD - 1]}"
 
     # 定义所有可用的子命令和选项
-    opts="list run add delete edit log show unpack zip unzip uz clear init version help --help -h -v -vv"
+    opts="list run add delete edit log show unpack zip unzip uz clear init export version help --help -h -v -vv"
 
     # 根据前一个单词(prev)来决定补全的内容
     case "${prev}" in
@@ -147,6 +147,12 @@ _cbk() {
     init)
         # 如果前一个单词是 init, 补全 init 命令的选项
         sub_opts="-type -h"
+        COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
+        return 0
+        ;;
+    export)
+        # 如果前一个单词是 export, 补全 export 命令的选项
+        sub_opts="-id -h -all"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;

@@ -1004,7 +1004,10 @@ func ContainsSpecialChars(s string) bool {
 		'%': true, '$': true, '#': true, '@': true, '&': true, '*': true, '(': true,
 		')': true, '{': true, '}': true, '[': true, ']': true, '|': true, '!': true,
 		'^': true, '~': true, '=': true, '+': true, '-': true, '.': true, ',': true,
-		'/': true, '?': true, ':': true,
+		'/': true, '?': true, ':': true, '，': true, '。': true, '？': true, '！': true,
+		'；': true, '：': true, '‘': true, '’': true, '“': true, '”': true, '（': true,
+		'）': true, '【': true, '】': true, '《': true, '》': true, '…': true, '—': true,
+		'～': true, '￥': true, '·': true, '、': true,
 	}
 
 	// 遍历字符串中的每个字符
@@ -1099,7 +1102,19 @@ func EnsureDirExists(dir string) error {
 //
 //	globals.ExcludeFunc - 生成的排除函数，根据不同模式判断文件或目录是否需要排除
 //	error - 解析过程中一般不会产生错误，当前固定返回 nil
+//
+// 特殊值:
+//
+//	"none" - 表示不排除任何内容，返回一个不排除任何内容的函数
 func ParseExclude(excludeValue string) (globals.ExcludeFunc, error) {
+	// 特殊值 "none" 表示不排除任何内容
+	if excludeValue == "none" {
+		// 返回一个不排除任何内容的函数
+		return func(path string, info os.FileInfo) bool {
+			return false
+		}, nil
+	}
+
 	// 将传入的排除值按 | 分割成多个排除模式
 	patterns := strings.Split(excludeValue, "|")
 
