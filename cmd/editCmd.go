@@ -17,6 +17,12 @@ func editCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("编辑任务时, 必须指定任务ID")
 	}
 
+	// 检查所有的参数是否都没指定
+	if *editName == "" && *editRetentionCount == -1 && *editRetentionDays == -1 && *editNoCompression == "" && *editNewDirName == "" {
+		CL.PrintWarn("未指定任何参数, 任务将不会被修改")
+		return nil
+	}
+
 	// 查询任务信息
 	editSql := "select task_name, retention_count, retention_days, backup_directory, no_compression from backup_tasks where task_id =?"
 	var task globals.BackupTask
