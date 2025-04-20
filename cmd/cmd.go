@@ -91,7 +91,7 @@ var (
 	// 子命令: run
 	runCmd = flag.NewFlagSet("run", flag.ExitOnError)
 	runID  = runCmd.Int("id", 0, "任务ID")
-	runIDs = runCmd.String("ids", "", "任务ID列表, 多个ID用管道符分隔")
+	runIDs = runCmd.String("ids", "", "任务ID列表, 多个ID用逗号分隔")
 
 	// 子命令: add
 	addCmd            = flag.NewFlagSet("add", flag.ExitOnError)
@@ -101,8 +101,12 @@ var (
 	addRetentionCount = addCmd.Int("c", 3, "保留数量")
 	addRetentionDays  = addCmd.Int("d", 0, "保留天数")
 	addBackupDirName  = addCmd.String("bn", "", "备份目录名(默认: 目标目录名)")
-	addNoCompression  = addCmd.Bool("nc", false, "是否禁用压缩（默认启用压缩）")
+	addNoCompression  = addCmd.Int("nc", 0, "是否禁用压缩(0: 启用压缩, 1: 禁用压缩)")
 	addConfig         = addCmd.String("f", "", "指定YAML格式的配置文件路径, 用于批量添加任务(格式参考: add_task.yaml)")
+	// addSkipDirs       = addCmd.String("skip-dirs", "", "需要跳过的目录名，用逗号分隔")
+	// addSkipExtensions = addCmd.String("skip-exts", "", "需要跳过的文件扩展名，用逗号分隔")
+	// addSkipFileNames  = addCmd.String("skip-files", "", "需要跳过的文件名，用逗号分隔")
+	// addSkipRegex      = addCmd.String("skip-regex", "", "需要跳过的路径正则表达式")
 
 	// 子命令: delete
 	deleteCmd       = flag.NewFlagSet("delete", flag.ExitOnError)
@@ -118,7 +122,11 @@ var (
 	editRetentionCount = editCmd.Int("c", -1, "指定备份文件的保留数量。如果未指定，则保留数量保持不变")
 	editRetentionDays  = editCmd.Int("d", -1, "指定备份文件的保留天数。如果未指定，则保留天数保持不变")
 	editNewDirName     = editCmd.String("bn", "", "指定新的备份目录名。如果未指定，则备份目录名保持不变")
-	editNoCompression  = editCmd.String("nc", "", "是否禁用压缩")
+	editNoCompression  = editCmd.Int("nc", -1, "是否禁用压缩(0: 启用压缩, 1: 禁用压缩, -1: 不修改)")
+	// editSkipDirs       = editCmd.String("skip-dirs", "", "需要跳过的目录名，用逗号分隔")
+	// editSkipExtensions = editCmd.String("skip-exts", "", "需要跳过的文件扩展名，用逗号分隔")
+	// editSkipFileNames  = editCmd.String("skip-files", "", "需要跳过的文件名，用逗号分隔")
+	// editSkipRegex      = editCmd.String("skip-regex", "", "需要跳过的路径正则表达式")
 
 	// 子命令: log
 	logCmd          = flag.NewFlagSet("log", flag.ExitOnError)

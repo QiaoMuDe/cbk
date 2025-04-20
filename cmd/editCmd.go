@@ -18,7 +18,7 @@ func editCmdMain(db *sqlx.DB) error {
 	}
 
 	// 检查所有的参数是否都没指定
-	if *editName == "" && *editRetentionCount == -1 && *editRetentionDays == -1 && *editNoCompression == "" && *editNewDirName == "" {
+	if *editName == "" && *editRetentionCount == -1 && *editRetentionDays == -1 && *editNoCompression == -1 && *editNewDirName == "" {
 		CL.PrintWarn("未指定任何参数, 任务将不会被修改")
 		return nil
 	}
@@ -48,18 +48,14 @@ func editCmdMain(db *sqlx.DB) error {
 	}
 
 	// 如果指定了-nc参数, 则更新是否禁用压缩
-	if *editNoCompression != "" {
+	if *editNoCompression != -1 {
 		// 检查如果不是true或false则报错
-		if *editNoCompression != "true" && *editNoCompression != "false" {
-			return fmt.Errorf("参数 -nc 只能是 true 或 false")
+		if *editNoCompression != 1 && *editNoCompression != 0 {
+			return fmt.Errorf("-nc 参数不合法, 只能是 0(启用压缩) 或 1(禁用压缩)")
 		}
 
 		// 根据参数值更新NoCompression字段
-		if *editNoCompression == "true" {
-			task.NoCompression = 1 // 1 表示禁用压缩
-		} else {
-			task.NoCompression = 0 // 0表示启用压缩
-		}
+		task.NoCompression = *editNoCompression
 	}
 
 	// 如果指定了-bn参数, 则更新备份目录
@@ -113,7 +109,7 @@ func editCmdMain(db *sqlx.DB) error {
 	if *editNewDirName != "" {
 		CL.PrintOkf("任务ID %d 的备份目录已更新为: %s", *editID, task.BackupDirectory)
 	}
-	if *editNoCompression != "" {
+	if *editNoCompression != -1 {
 		if task.NoCompression == 1 {
 			CL.PrintOkf("任务ID %d 的压缩状态已更新为: 禁用", *editID)
 		} else {

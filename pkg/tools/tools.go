@@ -2,6 +2,7 @@ package tools
 
 import (
 	"archive/zip"
+	"cbk/pkg/globals"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -552,12 +553,13 @@ func deleteFiles(db *sqlx.DB, files []FileWithModTime) error {
 //	targetName - 需要压缩的目标名称(文件或目录名)
 //	backupFileNamePath - 备份文件的基础路径(不含扩展名)
 //	noCompression - 是否禁用压缩，默认为false
+//	filter - 过滤函数，用于决定是否跳过文件或目录
 //
 // 返回值:
 //
 //	string - 生成的ZIP文件完整路径
 //	error - 操作过程中遇到的错误
-func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath string, noCompression int) (string, error) {
+func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath string, noCompression int, filter globals.FilterFunc) (string, error) {
 	// 构建完整的压缩文件路径(添加扩展名)
 	zipFilePath := fmt.Sprintf("%s%s", backupFileNamePath, ".zip")
 
@@ -567,7 +569,7 @@ func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath
 	}
 
 	// 调用CreateZip函数执行实际压缩操作
-	if err := CreateZip(zipFilePath, targetName, noCompression); err != nil {
+	if err := CreateZip(zipFilePath, targetName, noCompression, filter); err != nil {
 		return "", fmt.Errorf("压缩文件时出错: %w", err)
 	}
 
@@ -622,11 +624,12 @@ func UncompressFilesByOS(zipDir, zipFileName, outputPath string) (string, error)
 //	zipFilePath - 生成的ZIP文件路径
 //	sourceDir - 需要压缩的源目录路径
 //	noCompression - 是否禁用压缩，默认为false
+//	filter - 过滤函数，用于决定是否跳过文件或目录
 //
 // 返回值:
 //
 //	error - 操作过程中遇到的错误
-func CreateZip(zipFilePath string, sourceDir string, noCompression int) error {
+func CreateZip(zipFilePath string, sourceDir string, noCompression int, filter globals.FilterFunc) error {
 	// 检查zipFilePath是否为绝对路径，如果不是，将其转换为绝对路径
 	if !filepath.IsAbs(zipFilePath) {
 		absPath, err := filepath.Abs(zipFilePath)
@@ -635,6 +638,7 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int) error {
 		}
 		zipFilePath = absPath
 	}
+
 	// 检查sourceDir是否为绝对路径，如果不是，将其转换为绝对路径
 	if !filepath.IsAbs(sourceDir) {
 		absPath, err := filepath.Abs(sourceDir)
@@ -642,6 +646,13 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int) error {
 			return fmt.Errorf("转换sourceDir为绝对路径失败: %w", err)
 		}
 		sourceDir = absPath
+	}
+
+	// 如果没有提供过滤函数，则使用默认的不过滤函数
+	if filter == nil {
+		filter = func(path string, info os.FileInfo) bool {
+			return false // 默认不跳过任何文件
+		}
 	}
 
 	// 获取是否压缩的标志
@@ -678,6 +689,17 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int) error {
 		if err != nil {
 			return fmt.Errorf("遍历目录时出错: %w", err)
 		}
+
+		// 检查是否需要跳过当前文件或目录
+		if filter(path, info) {
+			if info.IsDir() {
+				// 如果是目录，跳过其所有子文件和子目录
+				return filepath.SkipDir
+			}
+			// 如果是文件，直接跳过
+			return nil
+		}
+
 		// 跳过目录本身
 		if !info.IsDir() {
 			// 累加文件大小
@@ -710,6 +732,16 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int) error {
 	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("遍历目录时出错: %w", err)
+		}
+
+		// 检查是否需要跳过当前文件或目录
+		if filter(path, info) {
+			if info.IsDir() {
+				// 如果是目录，跳过其所有子文件和子目录
+				return filepath.SkipDir
+			}
+			// 如果是文件，直接跳过
+			return nil
 		}
 
 		// 获取相对路径，保留顶层目录
@@ -1015,18 +1047,22 @@ func SanitizePath(path *string) error {
 //
 //	error - 如果发生错误，返回错误信息；否则返回 nil
 func RenameBackupDirectory(rootPath, oldDirName, newDirName string) error {
+	// 切换到备份存放目录的rootPath
 	if err := os.Chdir(rootPath); err != nil {
 		return fmt.Errorf("切换到备份存放目录的rootPath失败: %w, Path: %s", err, rootPath)
 	}
 
+	// 检查新的备份目录是否存在
 	if _, err := CheckPath(newDirName); err == nil {
 		return fmt.Errorf("备份目录已存在: %s, 请重试", filepath.Join(rootPath, newDirName))
 	}
 
+	// 检查旧的备份目录是否存在
 	if _, err := CheckPath(oldDirName); err != nil {
 		return fmt.Errorf("旧的备份目录不存在: %s", filepath.Join(rootPath, oldDirName))
 	}
 
+	// 重命名备份目录
 	if err := os.Rename(oldDirName, newDirName); err != nil {
 		return fmt.Errorf("重命名备份目录失败: %w, Old: %s, New: %s", err, oldDirName, newDirName)
 	}
@@ -1035,14 +1071,43 @@ func RenameBackupDirectory(rootPath, oldDirName, newDirName string) error {
 	return nil
 }
 
-// EnsureDirExists 确保目录存在，如果不存在则创建目录
-// 参数：dir - 要检查的目录路径
-// 返回：error - 如果目录不存在且创建失败，返回错误信息；否则返回 nil
+// EnsureDirExists 确保指定目录存在，如果不存在则创建该目录
+// 参数:
+//
+//	dir - 需要检查/创建的目录路径
+//
+// 返回值:
+//
+//	error - 如果目录不存在且创建失败，返回错误信息；否则返回nil
 func EnsureDirExists(dir string) error {
+	// 检查目录是否存在
 	if _, err := CheckPath(dir); err != nil {
+		// 如果目录不存在，则递归创建目录
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("目录创建失败: %w", err)
 		}
 	}
 	return nil
+}
+
+// CombineFilters 组合多个过滤函数，返回一个新的过滤函数
+// 参数:
+//
+//	filters - 可变参数，接收多个FilterFunc类型的过滤函数
+//
+// 返回值:
+//
+//	FilterFunc - 一个新的过滤函数，当任意一个输入过滤函数返回true时返回true
+func CombineFilters(filters ...globals.FilterFunc) globals.FilterFunc {
+	return func(path string, info os.FileInfo) bool {
+		// 遍历所有传入的过滤函数
+		for _, filter := range filters {
+			// 如果任一过滤函数返回true，则立即返回true
+			if filter(path, info) {
+				return true
+			}
+		}
+		// 所有过滤函数都返回false时，返回false
+		return false
+	}
 }

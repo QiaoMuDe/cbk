@@ -57,10 +57,10 @@ func addCmdMain(db *sqlx.DB) error {
 // - backupDir: 备份目录
 // - retentionCount: 保留文件数量
 // - retentionDays: 保留天数
-// - noCompression: 是否不压缩
+// - noCompression: 是否禁用压缩(默认启用压缩, 0 表示启用压缩, 1 表示禁用压缩)
 // 返回值:
 // - error: 错误信息
-func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, backupDirName string, retentionCount int, retentionDays int, noCompression bool) error {
+func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, backupDirName string, retentionCount int, retentionDays int, noCompression int) error {
 	// 检查任务名是否为空
 	if taskName == "" {
 		return fmt.Errorf("任务名不能为空")
@@ -96,6 +96,11 @@ func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, b
 	// 检查目标目录或文件是否存在
 	if _, err := tools.CheckPath(targetDir); err != nil {
 		return fmt.Errorf("目标目录或文件不存在: %w", err)
+	}
+
+	// 如果指定了禁用压缩, 则检查是否合法
+	if *addNoCompression != 1 && *addNoCompression != 0 {
+		return fmt.Errorf("-nc 参数不合法, 只能是 0(启用压缩) 或 1(禁用压缩)")
 	}
 
 	// 在数据库检查是否存在同名任务
@@ -158,17 +163,9 @@ func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, b
 		}
 	}
 
-	// 获取是否禁用压缩, 根据参数值设置变量值
-	var noCompressionInt int
-	if noCompression {
-		noCompressionInt = 1 // 禁用压缩
-	} else {
-		noCompressionInt = 0 // 启用压缩
-	}
-
 	// 插入新任务到数据库
 	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count, retention_days, no_compression) values(?, ?, ?, ?, ?, ?)"
-	if _, err := db.Exec(insertSql, taskName, absTargetDir, absBackupDir, retentionCount, retentionDays, noCompressionInt); err != nil {
+	if _, err := db.Exec(insertSql, taskName, absTargetDir, absBackupDir, retentionCount, retentionDays, *addNoCompression); err != nil {
 		return fmt.Errorf("插入任务失败: %w", err)
 	}
 

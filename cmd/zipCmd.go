@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cbk/pkg/globals"
 	"cbk/pkg/tools"
 	"fmt"
 	"strings"
@@ -60,7 +61,7 @@ func zipCmdMain() error {
 	}
 
 	// 创建ZIP文件
-	if err := tools.CreateZip(*zipOutput, *zipTarget, noCompression); err != nil {
+	if err := tools.CreateZip(*zipOutput, *zipTarget, noCompression, globals.NoFilter); err != nil {
 		return fmt.Errorf("创建ZIP文件失败: %w", err)
 	}
 

@@ -21,7 +21,7 @@ func runCmdMain(db *sqlx.DB) error {
 	// 如果指定了多个任务ID, 则执行多任务模式
 	if *runIDs != "" {
 		// 解析多个任务ID
-		for _, idStr := range strings.Split(*runIDs, "|") {
+		for _, idStr := range strings.Split(*runIDs, ",") {
 			// 检查解析的任务ID是否为空
 			if idStr == "" {
 				CL.PrintErr("任务ID不能为空")
@@ -68,7 +68,7 @@ func runCmdMain(db *sqlx.DB) error {
 
 	// 检查任务ID是否指定
 	if *runID == 0 || *runIDs == "" {
-		return fmt.Errorf("运行备份任务时, 必须指定任务ID或任务ID列表, 使用 -id 或 -ids 指定, 例如: -id 1 或 -ids '1|2|3'")
+		return fmt.Errorf("运行备份任务时, 必须指定任务ID或任务ID列表, 使用 -id 或 -ids 指定, 例如: -id 1 或 -ids '1,2,3'")
 	}
 
 	return nil
@@ -132,7 +132,7 @@ func runTask(db *sqlx.DB, ids []int) error {
 		backupFileNamePath := filepath.Join(task.BackupDirectory, backupFileNamePrefix) // 获取构建的备份文件路径
 
 		// 执行备份任务
-		zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath, task.NoCompression)
+		zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath, task.NoCompression, globals.NoFilter)
 		if err != nil {
 			// 插入备份记录
 			if _, err := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
