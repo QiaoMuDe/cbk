@@ -32,6 +32,8 @@ func addCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("解析 %s 配置文件失败: %w", *addConfig, err)
 		}
 
+		//
+
 		// 添加任务
 		if err := addTask(db, addTaskConfig.Task.Name, addTaskConfig.Task.Target, addTaskConfig.Task.Backup, addTaskConfig.Task.BackupDirName, addTaskConfig.Task.Retention.Count, addTaskConfig.Task.Retention.Days, addTaskConfig.Task.NoCompression); err != nil {
 			return fmt.Errorf("添加任务失败: %w", err)
@@ -79,6 +81,16 @@ func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, b
 		if tools.ContainsSpecialChars(backupDirName) {
 			return fmt.Errorf("备份目录名含非法字符, 请重试")
 		}
+	}
+
+	// 检查保留文件数量是否合法
+	if retentionCount <= 0 {
+		return fmt.Errorf("保留文件数量不能小于0")
+	}
+
+	// 检查保留天数是否合法
+	if retentionDays < 0 {
+		return fmt.Errorf("保留天数不能小于0")
 	}
 
 	// 检查目标目录或文件是否存在

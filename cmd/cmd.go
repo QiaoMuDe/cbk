@@ -114,9 +114,9 @@ var (
 	// 子命令: edit
 	editCmd            = flag.NewFlagSet("edit", flag.ExitOnError)
 	editName           = editCmd.String("n", "", "指定新的任务名。如果未指定，则任务名保持不变")
-	editID             = editCmd.Int("id", 0, "指定要编辑的备份任务ID")
-	editRetentionCount = editCmd.Int("c", 3, "指定备份文件的保留数量。如果未指定，则保留数量保持不变")
-	editRetentionDays  = editCmd.Int("d", 0, "指定备份文件的保留天数。如果未指定，则保留天数保持不变")
+	editID             = editCmd.Int("id", -1, "指定要编辑的备份任务ID")
+	editRetentionCount = editCmd.Int("c", -1, "指定备份文件的保留数量。如果未指定，则保留数量保持不变")
+	editRetentionDays  = editCmd.Int("d", -1, "指定备份文件的保留天数。如果未指定，则保留天数保持不变")
 	editNewDirName     = editCmd.String("bn", "", "指定新的备份目录名。如果未指定，则备份目录名保持不变")
 	editNoCompression  = editCmd.String("nc", "", "是否禁用压缩")
 

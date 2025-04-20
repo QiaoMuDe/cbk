@@ -13,12 +13,12 @@ import (
 // editCmdMain 编辑任务
 func editCmdMain(db *sqlx.DB) error {
 	// 检查任务ID是否指定
-	if *editID == 0 {
+	if *editID == -1 {
 		return fmt.Errorf("编辑任务时, 必须指定任务ID")
 	}
 
 	// 查询任务信息
-	editSql := "select task_name, retention_count,backup_directory, no_compression from backup_tasks where task_id =?"
+	editSql := "select task_name, retention_count, retention_days, backup_directory, no_compression from backup_tasks where task_id =?"
 	var task globals.BackupTask
 	if err := db.Get(&task, editSql, *editID); err == sql.ErrNoRows {
 		return fmt.Errorf("任务ID不存在 %d", *editID)
@@ -32,12 +32,12 @@ func editCmdMain(db *sqlx.DB) error {
 	}
 
 	// 如果指定了-c参数, 则更新保留数量
-	if *editRetentionCount != 0 {
+	if *editRetentionCount != -1 {
 		task.RetentionCount = *editRetentionCount
 	}
 
 	// 如果指定了-d参数, 则更新保留天数
-	if *editRetentionDays != 0 { // 保留天数默认为0
+	if *editRetentionDays != -1 { // 保留天数默认为0
 		task.RetentionDays = *editRetentionDays
 	}
 
@@ -98,10 +98,10 @@ func editCmdMain(db *sqlx.DB) error {
 	if *editName != "" {
 		CL.PrintOkf("任务ID %d 的任务名已更新为: %s", *editID, task.TaskName)
 	}
-	if *editRetentionCount != 0 {
+	if *editRetentionCount != -1 {
 		CL.PrintOkf("任务ID %d 的保留数量已更新为: %d", *editID, task.RetentionCount)
 	}
-	if *editRetentionDays != 0 {
+	if *editRetentionDays != -1 {
 		CL.PrintOkf("任务ID %d 的保留天数已更新为: %d", *editID, task.RetentionDays)
 	}
 	if *editNewDirName != "" {
