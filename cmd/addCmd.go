@@ -32,10 +32,8 @@ func addCmdMain(db *sqlx.DB) error {
 			return fmt.Errorf("解析 %s 配置文件失败: %w", *addConfig, err)
 		}
 
-		//
-
 		// 添加任务
-		if err := addTask(db, addTaskConfig.Task.Name, addTaskConfig.Task.Target, addTaskConfig.Task.Backup, addTaskConfig.Task.BackupDirName, addTaskConfig.Task.Retention.Count, addTaskConfig.Task.Retention.Days, addTaskConfig.Task.NoCompression); err != nil {
+		if err := addTask(db, addTaskConfig.Task.Name, addTaskConfig.Task.Target, addTaskConfig.Task.Backup, addTaskConfig.Task.BackupDirName, addTaskConfig.Task.Retention.Count, addTaskConfig.Task.Retention.Days, addTaskConfig.Task.NoCompression, addTaskConfig.Task.ExcludeRules); err != nil {
 			return fmt.Errorf("添加任务失败: %w", err)
 		}
 
@@ -43,7 +41,7 @@ func addCmdMain(db *sqlx.DB) error {
 	}
 
 	// 如果没有指定-f参数, 则执行普通添加任务模式
-	if err := addTask(db, *addName, *addTarget, *addBackup, *addBackupDirName, *addRetentionCount, *addRetentionDays, *addNoCompression); err != nil {
+	if err := addTask(db, *addName, *addTarget, *addBackup, *addBackupDirName, *addRetentionCount, *addRetentionDays, *addNoCompression, *addExcludeRules); err != nil {
 		return fmt.Errorf("添加任务失败: %w", err)
 	}
 	return nil
@@ -58,9 +56,10 @@ func addCmdMain(db *sqlx.DB) error {
 // - retentionCount: 保留文件数量
 // - retentionDays: 保留天数
 // - noCompression: 是否禁用压缩(默认启用压缩, 0 表示启用压缩, 1 表示禁用压缩)
+// - excludeRules: 排除规则
 // 返回值:
 // - error: 错误信息
-func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, backupDirName string, retentionCount int, retentionDays int, noCompression int) error {
+func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, backupDirName string, retentionCount int, retentionDays int, noCompression int, excludeRules string) error {
 	// 检查任务名是否为空
 	if taskName == "" {
 		return fmt.Errorf("任务名不能为空")
@@ -164,8 +163,8 @@ func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, b
 	}
 
 	// 插入新任务到数据库
-	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count, retention_days, no_compression) values(?, ?, ?, ?, ?, ?)"
-	if _, err := db.Exec(insertSql, taskName, absTargetDir, absBackupDir, retentionCount, retentionDays, *addNoCompression); err != nil {
+	insertSql := "insert into backup_tasks(task_name, target_directory, backup_directory, retention_count, retention_days, no_compression, exclude_rules) values(?, ?, ?, ?, ?, ?, ?)"
+	if _, err := db.Exec(insertSql, taskName, absTargetDir, absBackupDir, retentionCount, retentionDays, *addNoCompression, excludeRules); err != nil {
 		return fmt.Errorf("插入任务失败: %w", err)
 	}
 

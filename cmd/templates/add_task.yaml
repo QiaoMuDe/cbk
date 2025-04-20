@@ -1,10 +1,11 @@
 # add_task.yaml
 task:
   name: "example_task" # 任务名
-  target: "/path/to/target/directory" # 目标目录路径(路径请用单引号防止yaml解析错误)
-  backup: "/path/to/backup/directory" # 备份存放路径(路径请用单引号防止yaml解析错误)
+  target: '/path/to/target/directory' # 目标目录路径(路径请用单引号防止yaml解析错误)
+  backup: '/path/to/backup/directory' # 备份存放路径(路径请用单引号防止yaml解析错误)
   retention:
     count: 3 # 保留数量
     days: 7 # 保留天数(配置为0时禁用)
   backup_dir_name: "" # 备份目录名(配置为""时,默认获取目标目录的目录名作为备份目录名)
-  no_compression: false # 是否禁用压缩
+  no_compression: 0 # 是否禁用压缩(0:打包压缩,1:不压缩仅打包)
+  exclude_rules: "none" # 排除规则(配置为"none"时,默认不排除任何文件)

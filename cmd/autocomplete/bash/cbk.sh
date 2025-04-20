@@ -26,13 +26,13 @@ _cbk() {
         ;;
     add)
         # 如果前一个单词是 add, 补全 add 命令的选项
-        sub_opts="-n -t -b -c -d -bn -h -nc -f"
+        sub_opts="-n -t -b -c -d -bn -h -nc -f -ex"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
     a)
         # 如果前一个单词是 a, 补全 a 命令的选项
-        sub_opts="-n -t -b -c -d -bn -h -nc -f"
+        sub_opts="-n -t -b -c -d -bn -h -nc -f -ex"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
@@ -50,13 +50,13 @@ _cbk() {
         ;;
     edit)
         # 如果前一个单词是 edit, 补全 edit 命令的选项
-        sub_opts="-id -n -c -d -bn -h -nc"
+        sub_opts="-id -n -c -d -bn -h -nc -ex"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
     e)
         # 如果前一个单词是 e, 补全 e 命令的选项
-        sub_opts="-id -n -c -d -bn -h -nc"
+        sub_opts="-id -n -c -d -bn -h -nc -ex"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
@@ -116,13 +116,13 @@ _cbk() {
         ;;
     zip)
         # 如果前一个单词是 zip, 补全 zip 命令的选项
-        sub_opts="-o -t -h -nc"
+        sub_opts="-o -t -h -nc -ex"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
     z)
         # 如果前一个单词是 z, 补全 z 命令的选项
-        sub_opts="-o -t -h -nc"
+        sub_opts="-o -t -h -nc -ex"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
@@ -231,6 +231,13 @@ _cbk() {
     # 如果前一个单词是-d, 则补全文件名和目录名
     if [[ ${prev} == "-d" ]]; then
         sub_opts="$(ls)"
+        COMPREPLY=($(compgen -W "${sub_opts}" -f -d -- ${cur}))
+        return 0
+    fi
+
+    # 如果前一个单词是-ex, 则提示常见的排除规则
+    if [[ ${prev} == "-ex" ]]; then
+        sub_opts="*.log *.txt logs log"
         COMPREPLY=($(compgen -W "${sub_opts}" -f -d -- ${cur}))
         return 0
     fi

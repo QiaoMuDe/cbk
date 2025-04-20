@@ -553,13 +553,13 @@ func deleteFiles(db *sqlx.DB, files []FileWithModTime) error {
 //	targetName - 需要压缩的目标名称(文件或目录名)
 //	backupFileNamePath - 备份文件的基础路径(不含扩展名)
 //	noCompression - 是否禁用压缩，默认为false
-//	filter - 过滤函数，用于决定是否跳过文件或目录
+//	excludeFunc - 排除函数，用于决定是否跳过文件或目录
 //
 // 返回值:
 //
 //	string - 生成的ZIP文件完整路径
 //	error - 操作过程中遇到的错误
-func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath string, noCompression int, filter globals.FilterFunc) (string, error) {
+func CreateZipFromOSPaths(db *sqlx.DB, targetDir, targetName, backupFileNamePath string, noCompression int, filter globals.ExcludeFunc) (string, error) {
 	// 构建完整的压缩文件路径(添加扩展名)
 	zipFilePath := fmt.Sprintf("%s%s", backupFileNamePath, ".zip")
 
@@ -624,12 +624,12 @@ func UncompressFilesByOS(zipDir, zipFileName, outputPath string) (string, error)
 //	zipFilePath - 生成的ZIP文件路径
 //	sourceDir - 需要压缩的源目录路径
 //	noCompression - 是否禁用压缩，默认为false
-//	filter - 过滤函数，用于决定是否跳过文件或目录
+//	excludeFunc - 排除函数，用于决定是否跳过文件或目录
 //
 // 返回值:
 //
 //	error - 操作过程中遇到的错误
-func CreateZip(zipFilePath string, sourceDir string, noCompression int, filter globals.FilterFunc) error {
+func CreateZip(zipFilePath string, sourceDir string, noCompression int, excludeFunc globals.ExcludeFunc) error {
 	// 检查zipFilePath是否为绝对路径，如果不是，将其转换为绝对路径
 	if !filepath.IsAbs(zipFilePath) {
 		absPath, err := filepath.Abs(zipFilePath)
@@ -648,9 +648,9 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, filter g
 		sourceDir = absPath
 	}
 
-	// 如果没有提供过滤函数，则使用默认的不过滤函数
-	if filter == nil {
-		filter = func(path string, info os.FileInfo) bool {
+	// 如果没有提供排除函数，使用默认的排除函数
+	if excludeFunc == nil {
+		excludeFunc = func(path string, info os.FileInfo) bool {
 			return false // 默认不跳过任何文件
 		}
 	}
@@ -691,7 +691,7 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, filter g
 		}
 
 		// 检查是否需要跳过当前文件或目录
-		if filter(path, info) {
+		if excludeFunc(path, info) {
 			if info.IsDir() {
 				// 如果是目录，跳过其所有子文件和子目录
 				return filepath.SkipDir
@@ -735,7 +735,7 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, filter g
 		}
 
 		// 检查是否需要跳过当前文件或目录
-		if filter(path, info) {
+		if excludeFunc(path, info) {
 			if info.IsDir() {
 				// 如果是目录，跳过其所有子文件和子目录
 				return filepath.SkipDir
@@ -1090,24 +1090,60 @@ func EnsureDirExists(dir string) error {
 	return nil
 }
 
-// CombineFilters 组合多个过滤函数，返回一个新的过滤函数
+// ParseExclude 解析 --exclude 标志的值并生成排除函数
 // 参数:
 //
-//	filters - 可变参数，接收多个FilterFunc类型的过滤函数
+//	excludeValue - 传入的 --exclude 标志的值，多个排除模式使用 | 分隔
 //
 // 返回值:
 //
-//	FilterFunc - 一个新的过滤函数，当任意一个输入过滤函数返回true时返回true
-func CombineFilters(filters ...globals.FilterFunc) globals.FilterFunc {
+//	globals.ExcludeFunc - 生成的排除函数，根据不同模式判断文件或目录是否需要排除
+//	error - 解析过程中一般不会产生错误，当前固定返回 nil
+func ParseExclude(excludeValue string) (globals.ExcludeFunc, error) {
+	// 将传入的排除值按 | 分割成多个排除模式
+	patterns := strings.Split(excludeValue, "|")
+
+	// 返回一个排除函数，用于判断文件或目录是否需要排除
 	return func(path string, info os.FileInfo) bool {
-		// 遍历所有传入的过滤函数
-		for _, filter := range filters {
-			// 如果任一过滤函数返回true，则立即返回true
-			if filter(path, info) {
-				return true
+		// 获取路径的基础文件名
+		base := filepath.Base(path)
+		// 获取文件的扩展名
+		ext := filepath.Ext(path)
+
+		// 遍历所有排除模式
+		for _, pattern := range patterns {
+			// 跳过空的排除模式
+			if pattern == "" {
+				continue
+			}
+
+			// 根据不同的模式类型进行判断
+			switch {
+			case strings.HasSuffix(pattern, "/"):
+				// 带正斜杠结尾的视为目录排除规则
+				// 去掉末尾的 / 得到目录名
+				dirPattern := pattern[:len(pattern)-1]
+				// 如果当前路径是目录且目录名匹配，则返回 true 表示需要排除
+				if info.IsDir() && filepath.Base(path) == dirPattern {
+					return true
+				}
+			case strings.HasPrefix(pattern, "."):
+				// 以点开头的视为扩展名排除规则
+				// 如果文件扩展名匹配，则返回 true 表示需要排除
+				if ext == pattern {
+					return true
+				}
+			default:
+				// 其他情况视为普通文件名或通配符模式排除规则
+				// 使用 filepath.Match 函数进行匹配
+				matched, err := filepath.Match(pattern, base)
+				// 如果匹配成功且没有错误，则返回 true 表示需要排除
+				if err == nil && matched {
+					return true
+				}
 			}
 		}
-		// 所有过滤函数都返回false时，返回false
+		// 所有模式都不匹配，返回 false 表示不需要排除
 		return false
-	}
+	}, nil
 }

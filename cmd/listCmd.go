@@ -28,7 +28,7 @@ func listCmdMain(db *sqlx.DB) error {
 	}
 
 	// 查询所有任务
-	querySql := "SELECT task_id, task_name, target_directory, backup_directory, retention_count, retention_days, no_compression FROM backup_tasks;"
+	querySql := "SELECT task_id, task_name, target_directory, backup_directory, retention_count, retention_days, no_compression, exclude_rules FROM backup_tasks;"
 
 	// 定义存储查询结果的结构体
 	var tasks globals.BackupTasks
@@ -41,16 +41,16 @@ func listCmdMain(db *sqlx.DB) error {
 	// 禁用表格的输出
 	if *listNoTable || *listNoTableShort {
 		// 打印任务列表
-		fmt.Printf("%-30s %-10s %-15s %-15s %-30s %-30s %-20s\n",
-			"任务名", "任务ID", "保留数量", "保留天数", "目标目录", "备份目录", "是否禁用压缩")
+		fmt.Printf("%-30s %-10s %-15s %-15s %-30s %-30s %-20s %-30s\n",
+			"任务名", "任务ID", "保留数量", "保留天数", "目标目录", "备份目录", "是否禁用压缩", "排除规则")
 		for _, task := range tasks {
-			fmt.Printf("%-30s %-10d %-15d %-15d %-30s %-30s %-10s\n", task.TaskName, task.TaskID, task.RetentionCount, task.RetentionDays, task.TargetDirectory, task.BackupDirectory, func() string {
+			fmt.Printf("%-30s %-10d %-15d %-15d %-30s %-30s %-10s, %-30s\n", task.TaskName, task.TaskID, task.RetentionCount, task.RetentionDays, task.TargetDirectory, task.BackupDirectory, func() string {
 				if task.NoCompression == 0 {
 					return "false"
 				} else {
 					return "true"
 				}
-			}())
+			}(), task.ExcludeRules)
 		}
 
 		return nil
@@ -60,7 +60,7 @@ func listCmdMain(db *sqlx.DB) error {
 	t.SetOutputMirror(os.Stdout)
 
 	// 设置表头
-	t.AppendHeader(table.Row{"ID", "任务名", "保留数量", "保留天数", "目标目录", "备份目录", "是否禁用压缩"})
+	t.AppendHeader(table.Row{"ID", "任务名", "保留数量", "保留天数", "目标目录", "备份目录", "是否禁用压缩", "排除规则"})
 
 	// 设置列配置
 	t.SetColumnConfigs([]table.ColumnConfig{
@@ -71,6 +71,7 @@ func listCmdMain(db *sqlx.DB) error {
 		{Name: "目标目录", Align: text.AlignLeft, WidthMaxEnforcer: text.WrapHard},
 		{Name: "备份目录", Align: text.AlignLeft, WidthMaxEnforcer: text.WrapHard},
 		{Name: "是否禁用压缩", Align: text.AlignCenter, WidthMaxEnforcer: text.WrapHard},
+		{Name: "排除规则", Align: text.AlignLeft, WidthMaxEnforcer: text.WrapHard},
 	})
 
 	// 添加数据行
@@ -89,6 +90,7 @@ func listCmdMain(db *sqlx.DB) error {
 					return "true"
 				}
 			}(),
+			task.ExcludeRules,
 		})
 	}
 

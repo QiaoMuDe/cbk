@@ -85,7 +85,7 @@ func runTask(db *sqlx.DB, ids []int) error {
 	var task globals.BackupTask
 
 	// 构建查询任务信息的SQL语句
-	querySql := "select task_name, target_directory, backup_directory, retention_count, retention_days, no_compression from backup_tasks where task_id =?"
+	querySql := "select task_name, target_directory, backup_directory, retention_count, retention_days, no_compression, exclude_rules from backup_tasks where task_id =?"
 
 	// 构建失败记录的SQL语句
 	errorSql := "insert into backup_records (version_id, task_id, timestamp, task_name, backup_status, backup_file_name, backup_size, backup_path, version_hash) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -123,6 +123,18 @@ func runTask(db *sqlx.DB, ids []int) error {
 		backupTime := time.Now().Format("20060102150405")
 		backupFileNamePrefix := fmt.Sprintf("%s_%s", task.TaskName, backupTime)
 
+		// 获取排除函数
+		var excludeFunc globals.ExcludeFunc
+		if task.ExcludeRules != "none" {
+			var err error
+			if excludeFunc, err = tools.ParseExclude(task.ExcludeRules); err != nil {
+				CL.PrintErrf("解析任务ID %d 的排除规则失败: %v", id, err)
+				continue
+			}
+		} else {
+			excludeFunc = globals.NoExcludeFunc // 默认不进行过滤
+		}
+
 		// 获取versionID
 		versionID := tools.GenerateID(6)
 
@@ -132,7 +144,7 @@ func runTask(db *sqlx.DB, ids []int) error {
 		backupFileNamePath := filepath.Join(task.BackupDirectory, backupFileNamePrefix) // 获取构建的备份文件路径
 
 		// 执行备份任务
-		zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath, task.NoCompression, globals.NoFilter)
+		zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath, task.NoCompression, excludeFunc)
 		if err != nil {
 			// 插入备份记录
 			if _, err := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {

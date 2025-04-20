@@ -24,6 +24,11 @@ func zipCmdMain() error {
 		return fmt.Errorf("ZIP文件路径必须以.zip结尾: %s", *zipOutput)
 	}
 
+	// 检查-nc参数是否合法
+	if *zipNoCompression != 1 && *zipNoCompression != 0 {
+		return fmt.Errorf("-nc 参数不合法, 只能是 0(启用压缩) 或 1(禁用压缩)")
+	}
+
 	// 清理路径并获取绝对路径
 	if err := tools.SanitizePath(zipOutput); err != nil {
 		return fmt.Errorf("清理路径并获取绝对路径失败: %w", err)
@@ -52,16 +57,19 @@ func zipCmdMain() error {
 		return fmt.Errorf("指定的目录路径不存在: %s", *zipTarget)
 	}
 
-	// 获取是否禁用压缩
-	var noCompression int
-	if *zipNoCompression {
-		noCompression = 1 // 禁用压缩
+	// 获取过滤函数
+	var excludeFunc globals.ExcludeFunc
+	if *zipExcludeRules != "none" {
+		var err error
+		if excludeFunc, err = tools.ParseExclude(*zipExcludeRules); err != nil {
+			return fmt.Errorf("解析过滤规则失败: %w", err)
+		}
 	} else {
-		noCompression = 0 // 默认启用压缩
+		excludeFunc = globals.NoExcludeFunc // 默认不进行过滤
 	}
 
 	// 创建ZIP文件
-	if err := tools.CreateZip(*zipOutput, *zipTarget, noCompression, globals.NoFilter); err != nil {
+	if err := tools.CreateZip(*zipOutput, *zipTarget, *zipNoCompression, excludeFunc); err != nil {
 		return fmt.Errorf("创建ZIP文件失败: %w", err)
 	}
 

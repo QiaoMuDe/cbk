@@ -103,10 +103,7 @@ var (
 	addBackupDirName  = addCmd.String("bn", "", "备份目录名(默认: 目标目录名)")
 	addNoCompression  = addCmd.Int("nc", 0, "是否禁用压缩(0: 启用压缩, 1: 禁用压缩)")
 	addConfig         = addCmd.String("f", "", "指定YAML格式的配置文件路径, 用于批量添加任务(格式参考: add_task.yaml)")
-	// addSkipDirs       = addCmd.String("skip-dirs", "", "需要跳过的目录名，用逗号分隔")
-	// addSkipExtensions = addCmd.String("skip-exts", "", "需要跳过的文件扩展名，用逗号分隔")
-	// addSkipFileNames  = addCmd.String("skip-files", "", "需要跳过的文件名，用逗号分隔")
-	// addSkipRegex      = addCmd.String("skip-regex", "", "需要跳过的路径正则表达式")
+	addExcludeRules   = addCmd.String("ex", "none", "指定要排除的目录名、文件名、扩展名, 用于排除备份文件, 支持通配符模式(默认为none, 不排除任何文件)")
 
 	// 子命令: delete
 	deleteCmd       = flag.NewFlagSet("delete", flag.ExitOnError)
@@ -123,10 +120,7 @@ var (
 	editRetentionDays  = editCmd.Int("d", -1, "指定备份文件的保留天数。如果未指定，则保留天数保持不变")
 	editNewDirName     = editCmd.String("bn", "", "指定新的备份目录名。如果未指定，则备份目录名保持不变")
 	editNoCompression  = editCmd.Int("nc", -1, "是否禁用压缩(0: 启用压缩, 1: 禁用压缩, -1: 不修改)")
-	// editSkipDirs       = editCmd.String("skip-dirs", "", "需要跳过的目录名，用逗号分隔")
-	// editSkipExtensions = editCmd.String("skip-exts", "", "需要跳过的文件扩展名，用逗号分隔")
-	// editSkipFileNames  = editCmd.String("skip-files", "", "需要跳过的文件名，用逗号分隔")
-	// editSkipRegex      = editCmd.String("skip-regex", "", "需要跳过的路径正则表达式")
+	//editExcludeRules   = editCmd.String("ex", "none", "指定要排除的目录名、文件名、扩展名, 用于排除备份文件, 支持通配符模式")
 
 	// 子命令: log
 	logCmd          = flag.NewFlagSet("log", flag.ExitOnError)
@@ -154,7 +148,8 @@ var (
 	zipCmd           = flag.NewFlagSet("zip", flag.ExitOnError)
 	zipOutput        = zipCmd.String("o", "未命名.zip", "指定输出的压缩包名(默认: 未命名.zip)")
 	zipTarget        = zipCmd.String("t", "", "指定要打包的目标路径")
-	zipNoCompression = zipCmd.Bool("nc", false, "是否禁用压缩（默认启用压缩）")
+	zipNoCompression = zipCmd.Int("nc", 0, "是否禁用压缩（默认启用压缩）")
+	zipExcludeRules  = zipCmd.String("ex", "none", "指定要排除的目录名、文件名、扩展名, 用于排除备份文件, 支持通配符模式")
 
 	// 子命令: unzip
 	unzipCmd       = flag.NewFlagSet("unzip", flag.ExitOnError)

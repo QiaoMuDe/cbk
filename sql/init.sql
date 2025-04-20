@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS backup_tasks (
     backup_directory TEXT, -- 备份文件存放的目标目录
     retention_count INTEGER, -- 保留数量
     retention_days INTEGER, -- 保留天数
-    no_compression INTEGER  -- 是否禁用压缩（默认启用压缩，设置为 0 表示启用压缩, 1 表示禁用压缩）
+    no_compression INTEGER,  -- 是否禁用压缩（默认启用压缩，设置为 0 表示启用压缩, 1 表示禁用压缩）
+    exclude_rules TEXT -- 用于存储排除规则 （例如: *.txt, *.jpg）"none" 表示不排除任何文件
 );
 
 -- 添加索引，用于提高查询效率

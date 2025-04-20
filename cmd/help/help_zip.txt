@@ -4,13 +4,17 @@
   将指定的目标路径打包为一个压缩文件。
 
 参数：
-  -o <压缩包名>       必需。指定输出的压缩包名。(默认为 "未命名.zip")
-  -t <目标路径>       必需。指定要打包的目标路径。
-  -nc                 可选。是否禁用压缩（默认启用压缩）。
+  -o  <压缩包名>       必需。指定输出的压缩包名。(默认为 "未命名.zip")
+  -t  <目标路径>       必需。指定要打包的目标路径。
+  -nc <选项>           可选。是否禁用压缩(默认为启用压缩, 0为启用压缩, 1为禁用压缩)。
+  -ex <排除规则>       可选。指定要排除的文件名、目录名、扩展名、通配符等，用于排除不需要备份的文件(配置为'none'表示没有排除规则)。
 
 示例：
   cbk zip -o backup.zip -t /home/user/documents
   将 "/home/user/documents" 目录打包为名为 "backup.zip" 的压缩文件。
 
-  cbk zip -o backup.zip -t /home/user/documents -nc
+  cbk zip -o backup.zip -t /home/user/documents -nc 1
   将 "/home/user/documents" 目录打包为名为 "backup.zip" 的压缩文件，但禁用压缩。
+
+  cbk zip -o backup.zip -t /home/user/documents -ex "*.txt|*.doc|*.docx"
+  将 "/home/user/documents" 目录打包为名为 "backup.zip" 的压缩文件，但排除所有扩展名为 ".txt"、".doc" 和 ".docx" 的文件。
