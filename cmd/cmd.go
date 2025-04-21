@@ -94,7 +94,7 @@ var (
 	// 子命令: run
 	runCmd = flag.NewFlagSet("run", flag.ExitOnError)
 	runID  = runCmd.Int("id", 0, "任务ID")
-	runIDs = runCmd.String("ids", "", "任务ID列表, 多个ID用逗号分隔")
+	runIDS = runCmd.String("ids", "", "任务ID列表, 多个ID用逗号分隔")
 
 	// 子命令: add
 	addCmd            = flag.NewFlagSet("add", flag.ExitOnError)
@@ -118,6 +118,7 @@ var (
 	// 子命令: edit
 	editCmd            = flag.NewFlagSet("edit", flag.ExitOnError)
 	editID             = editCmd.Int("id", -1, "指定要编辑的备份任务ID")
+	editIDS            = editCmd.String("ids", "", "指定要编辑的备份任务ID列表, 多个ID用逗号分隔")
 	editName           = editCmd.String("n", "", "指定新的任务名。如果未指定，则任务名保持不变")
 	editRetentionCount = editCmd.Int("c", -1, "指定备份文件的保留数量。如果未指定，则保留数量保持不变")
 	editRetentionDays  = editCmd.Int("d", -1, "指定备份文件的保留天数。如果未指定，则保留天数保持不变")

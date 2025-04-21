@@ -48,14 +48,17 @@ cbk - 命令行备份任务管理工具
 
   cbk run -id 1
     运行ID为1的备份任务。
+  
+  cbk run -ids "1,2,3"
+    运行ID为1、2、3的备份任务。
 
-  cbk add -n "每日备份" -t "/data" -b "/backup" -k 7
+  cbk add -n "每日备份" -t "/data" -b "/backup" -c 7
     添加一个名为“每日备份”的备份任务，目标目录为“/data”，备份文件存放在“/backup”，保留最近7个备份。
 
   cbk delete -id 2
     删除ID为2的备份任务。
 
-  cbk edit -id 3 -n "周备份" -k 4
+  cbk edit -id 3 -n "周备份" -c 4
     将ID为3的备份任务名称改为“周备份”，并将保留数量设置为4。
 
   cbk log -l 20

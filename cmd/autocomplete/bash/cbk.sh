@@ -50,13 +50,13 @@ _cbk() {
         ;;
     edit)
         # 如果前一个单词是 edit, 补全 edit 命令的选项
-        sub_opts="-id -n -c -d -bn -h -nc -ex"
+        sub_opts="-id -ids -n -c -d -bn -h -nc -ex"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
     e)
         # 如果前一个单词是 e, 补全 e 命令的选项
-        sub_opts="-id -n -c -d -bn -h -nc -ex"
+        sub_opts="-id -ids -n -c -d -bn -h -nc -ex"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
@@ -163,6 +163,14 @@ _cbk() {
 
     # 如果前一个单词是 -id, 补全任务 ID
     if [[ ${prev} == "-id" ]]; then
+        # 获取任务 ID 列表
+        local task_ids=$(cbk list -nt | awk 'NR>1 {print $2}')
+        COMPREPLY=($(compgen -W "${task_ids}" -- ${cur}))
+        return 0
+    fi
+
+    # 如果前一个单词是 -ids, 补全任务 ID
+    if [[ ${prev} == "-ids" ]]; then
         # 获取任务 ID 列表
         local task_ids=$(cbk list -nt | awk 'NR>1 {print $2}')
         COMPREPLY=($(compgen -W "${task_ids}" -- ${cur}))
