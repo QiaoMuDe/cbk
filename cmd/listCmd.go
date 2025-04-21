@@ -44,7 +44,7 @@ func listCmdMain(db *sqlx.DB) error {
 		fmt.Printf("%-30s %-10s %-15s %-15s %-30s %-30s %-20s %-30s\n",
 			"任务名", "任务ID", "保留数量", "保留天数", "目标目录", "备份目录", "是否禁用压缩", "排除规则")
 		for _, task := range tasks {
-			fmt.Printf("%-30s %-10d %-15d %-15d %-30s %-30s %-10s, %-30s\n", task.TaskName, task.TaskID, task.RetentionCount, task.RetentionDays, task.TargetDirectory, task.BackupDirectory, func() string {
+			fmt.Printf("%-30s %-10d %-15d %-15d %-30s %-30s %-10s %-30s\n", task.TaskName, task.TaskID, task.RetentionCount, task.RetentionDays, task.TargetDirectory, task.BackupDirectory, func() string {
 				if task.NoCompression == 0 {
 					return "false"
 				} else {
