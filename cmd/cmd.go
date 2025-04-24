@@ -2,11 +2,13 @@
 package cmd
 
 import (
+	"cbk/pkg/globals"
 	"cbk/pkg/version"
 	_ "embed"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gitee.com/MM-Q/colorlib"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -83,6 +85,9 @@ var AddTaskTemplate string // 定义添加任务的模板文件
 //go:embed help/help_export.txt
 var HelpExportText string // 定义子命令: export的帮助文本
 
+//go:embed sql/init.sql
+var initSql string // 初始化SQL语句
+
 // 定义子命令及其参数
 var (
 	// 子命令: list
@@ -111,6 +116,7 @@ var (
 	// 子命令: delete
 	deleteCmd       = flag.NewFlagSet("delete", flag.ExitOnError)
 	deleteID        = deleteCmd.Int("id", 0, "任务ID")
+	deleteIDS       = deleteCmd.String("ids", "", "任务ID列表, 多个ID用逗号分隔")
 	deleteName      = deleteCmd.String("n", "", "任务名")
 	deleteDirF      = deleteCmd.Bool("d", false, "在删除任务时，是否同时删除备份文件。若启用此选项，备份文件将被一同删除")
 	deleteVersionID = deleteCmd.String("v", "", "指定要删除的备份版本ID")
@@ -180,88 +186,232 @@ var (
 	exportAll = exportCmd.Bool("all", false, "导出所有任务")
 )
 
+// 初始化子命令的帮助信息
 func init() {
 	// 初始化list命令的帮助信息
 	listCmd.Usage = func() {
 		fmt.Println(HelpListText)
-		os.Exit(0)
 	}
 
 	// 初始化run命令的帮助信息
 	runCmd.Usage = func() {
 		fmt.Println(HelpRunText)
-		os.Exit(0)
 	}
 
 	// 初始化add命令的帮助信息
 	addCmd.Usage = func() {
 		fmt.Println(HelpAddText)
-		os.Exit(0)
 	}
 
 	// 初始化delete命令的帮助信息
 	deleteCmd.Usage = func() {
 		fmt.Println(HelpDeleteText)
-		os.Exit(0)
 	}
 
 	// 初始化edit命令的帮助信息
 	editCmd.Usage = func() {
 		fmt.Println(HelpEditText)
-		os.Exit(0)
 	}
 
 	// 初始化log命令的帮助信息
 	logCmd.Usage = func() {
 		fmt.Println(HelpLogText)
-		os.Exit(0)
 	}
 
 	// 初始化show命令的帮助信息
 	showCmd.Usage = func() {
 		fmt.Println(HelpShowText)
-		os.Exit(0)
 	}
 
 	// 初始化unpack命令的帮助信息
 	unpackCmd.Usage = func() {
 		fmt.Println(HelpUnpackText)
-		os.Exit(0)
 	}
 
 	// 初始化zip命令的帮助信息
 	zipCmd.Usage = func() {
 		fmt.Println(HelpZipText)
-		os.Exit(0)
 	}
 
 	// 初始化unzip命令的帮助信息
 	unzipCmd.Usage = func() {
 		fmt.Println(HelpUnzipText)
-		os.Exit(0)
 	}
 
 	// 初始化clear命令的帮助信息
 	clearCmd.Usage = func() {
 		fmt.Println(HelpClearText)
-		os.Exit(0)
 	}
 
 	// 初始化init命令的帮助信息
 	initCmd.Usage = func() {
 		fmt.Println(HelpInitText)
-		os.Exit(0)
 	}
 
 	// 初始化export命令的帮助信息
 	exportCmd.Usage = func() {
 		fmt.Println(HelpExportText)
-		os.Exit(0)
 	}
 }
 
+// 程序运行入口
+func AppRun() error {
+	// 初始化数据库
+	db, initDBErr := initDB()
+	if initDBErr != nil {
+		return fmt.Errorf("初始化数据库失败: %w", initDBErr)
+	}
+
+	// 在返回时关闭数据库连接
+	defer func() {
+		// 检查数据库是否打开，如果打开则关闭
+		if db != nil {
+			if closeErr := db.Close(); closeErr != nil {
+				CL.PrintErrf("关闭数据库连接失败: %v", closeErr)
+			}
+		}
+	}()
+
+	// 初始化数据目录
+	if initDataDirErr := initDataDir(); initDataDirErr != nil {
+		return fmt.Errorf("初始化数据目录失败: %w", initDataDirErr)
+	}
+
+	// 主标志
+	vFlag := flag.Bool("v", false, "显示版本信息")
+	vvFlag := flag.Bool("vv", false, "显示更详细的版本信息")
+	hFlag := flag.Bool("h", false, "显示帮助信息")
+	helpFlag := flag.Bool("help", false, "显示帮助信息")
+
+	// 解析主标志
+	flag.Parse()
+
+	// 打印版本信息
+	if *vFlag {
+		v := version.Get()
+		if versionInfo, newErr := v.SprintVersion("simple"); newErr != nil {
+			return fmt.Errorf("获取版本信息失败: %w", newErr)
+		} else {
+			CL.Green(versionInfo)
+		}
+		return nil
+	}
+
+	// 打印更详细的版本信息
+	if *vvFlag {
+		v := version.Get()
+		if versionInfo, newErr := v.SprintVersion("text"); newErr != nil {
+			return fmt.Errorf("获取版本信息失败: %w", newErr)
+		} else {
+			CL.Green(versionInfo)
+		}
+		return nil
+	}
+
+	// 打印帮助信息
+	if *hFlag || *helpFlag {
+		fmt.Println(HelpText)
+		return nil
+	}
+
+	// 获取命令行参数
+	args := flag.Args()
+
+	// 检查是否有子命令
+	if len(args) == 0 {
+		flag.PrintDefaults()
+		return nil
+	}
+
+	// 执行子命令
+	if execCmdErr := executeCommands(db, args); execCmdErr != nil {
+		return fmt.Errorf("执行子命令失败: %w", execCmdErr)
+	}
+
+	return nil
+}
+
+// 初始化数据库
+// 返回值:
+// *sqlx.DB: 数据库连接
+// error: 错误信息
+func initDB() (*sqlx.DB, error) {
+	// 获取用户主目录
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("获取用户主目录失败: %w", err)
+	}
+
+	// 构造数据库目录路径
+	dbDir := filepath.Join(homeDir, globals.CbkHomeDir)
+
+	// 检查数据库目录是否存在, 如果不存在, 则创建
+	if _, statErr := os.Stat(dbDir); os.IsNotExist(statErr) {
+		if mkdirErr := os.MkdirAll(dbDir, 0755); mkdirErr != nil {
+			return nil, fmt.Errorf("创建数据库目录失败: %w", mkdirErr)
+		}
+	} else if statErr != nil {
+		return nil, fmt.Errorf("检查数据库目录失败: %w", statErr)
+	}
+
+	// 构造数据库文件路径
+	dbPath := filepath.Join(dbDir, globals.CbkDBFile)
+
+	// 检查数据库文件是否存在, 如果不存在, 则创建并初始化
+	if _, statErr := os.Stat(dbPath); os.IsNotExist(statErr) {
+		// 连接数据库
+		db, connectErr := sqlx.Connect("sqlite3", dbPath)
+		if connectErr != nil {
+			return nil, fmt.Errorf("连接数据库失败: %w", connectErr)
+		}
+
+		// 执行初始化SQL语句
+		if _, execErr := db.Exec(initSql); execErr != nil {
+			return nil, fmt.Errorf("执行初始化SQL语句失败: %w", execErr)
+		}
+
+		// 直接返回连接
+		return db, nil
+	} else if statErr != nil {
+		return nil, fmt.Errorf("连接到数据库文件失败: %w", statErr)
+	}
+
+	// 存在数据库文件, 直接连接
+	db, connectErr := sqlx.Connect("sqlite3", dbPath)
+	if connectErr != nil {
+		return nil, fmt.Errorf("连接数据库失败: %w", connectErr)
+	}
+
+	return db, nil
+}
+
+// 初始化数据目录
+// 返回值:
+// error: 错误信息
+func initDataDir() error {
+	// 获取用户主目录
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("获取用户主目录失败: %w", err)
+	}
+
+	// 构造数据目录路径
+	dataDir := filepath.Join(homeDir, globals.CbkHomeDir, globals.CbkDataDir)
+
+	// 检查数据目录是否存在, 如果不存在, 则创建
+	if _, statErr := os.Stat(dataDir); os.IsNotExist(statErr) {
+		if mkdirErr := os.MkdirAll(dataDir, 0755); mkdirErr != nil {
+			return fmt.Errorf("创建数据目录失败: %w", mkdirErr)
+		}
+	} else if statErr != nil {
+		return fmt.Errorf("检查数据目录失败: %w", statErr)
+	}
+
+	return nil
+}
+
 // 定义子命令的执行逻辑
-func ExecuteCommands(db *sqlx.DB, args []string) error {
+func executeCommands(db *sqlx.DB, args []string) error {
 	switch args[0] {
 	case "list":
 		// 解析list命令的参数
