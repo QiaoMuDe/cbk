@@ -1,6 +1,6 @@
 module cbk
 
-go 1.23.4
+go 1.24.2
 
 require (
 	gitee.com/MM-Q/colorlib v1.1.6
