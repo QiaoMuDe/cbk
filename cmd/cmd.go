@@ -3,7 +3,6 @@ package cmd
 
 import (
 	"cbk/pkg/globals"
-	"cbk/pkg/version"
 	_ "embed"
 	"flag"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"path/filepath"
 
 	"gitee.com/MM-Q/colorlib"
+	"gitee.com/MM-Q/verman"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jmoiron/sqlx"
 )
@@ -288,7 +288,7 @@ func AppRun() error {
 
 	// 打印版本信息
 	if *vFlag {
-		v := version.Get()
+		v := verman.Get()
 		if versionInfo, newErr := v.SprintVersion("simple"); newErr != nil {
 			return fmt.Errorf("获取版本信息失败: %w", newErr)
 		} else {
@@ -299,7 +299,7 @@ func AppRun() error {
 
 	// 打印更详细的版本信息
 	if *vvFlag {
-		v := version.Get()
+		v := verman.Get()
 		if versionInfo, newErr := v.SprintVersion("text"); newErr != nil {
 			return fmt.Errorf("获取版本信息失败: %w", newErr)
 		} else {
@@ -610,7 +610,7 @@ func executeCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("解析version命令参数失败: %v", err)
 		}
 		// 执行version命令的逻辑
-		v := version.Get()
+		v := verman.Get()
 		if versionInfo, err := v.SprintVersion("text"); err != nil {
 			return fmt.Errorf("获取版本信息失败: %v", err)
 		} else {

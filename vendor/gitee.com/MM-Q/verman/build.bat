@@ -3,9 +3,9 @@ chcp 65001 > nul
 setlocal
 
 :: 设置输出文件名
-set OUTPUT_FILE=cbk.exe
+set OUTPUT_FILE=输出文件名.exe
 :: 设置项目名
-set PROJECT_NAME=cbk
+set PROJECT_NAME=项目名
 :: 入口文件
 set ENTRY_FILE=main.go
 
