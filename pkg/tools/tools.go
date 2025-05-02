@@ -909,9 +909,11 @@ func Unzip(zipFilePath string, targetDir string) error {
 	}
 	defer zipReader.Close()
 
-	// 确保目标目录存在
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		return fmt.Errorf("创建目标目录失败: %w", err)
+	// 检查目标目录是否存在, 如果不存在, 则创建
+	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(targetDir, 0644); err != nil {
+			return fmt.Errorf("创建目标目录失败: %w", err)
+		}
 	}
 
 	// 获取 ZIP 文件的总大小
@@ -957,12 +959,30 @@ func Unzip(zipFilePath string, targetDir string) error {
 				return fmt.Errorf("读取软链接目标失败: %w", err)
 			}
 
+			// 检查软链接的父目录是否存在，如果不存在，则创建
+			parentDir := filepath.Dir(targetPath)
+			if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+				if err := os.MkdirAll(parentDir, 0644); err != nil {
+					return fmt.Errorf("创建软链接的父目录失败: %w", err)
+				}
+			}
+
 			// 创建软链接
 			if err := os.Symlink(target, targetPath); err != nil {
 				return fmt.Errorf("创建软链接失败: %w", err)
 			}
 		default:
 			// 普通文件
+
+			// 检查file的父目录是否存在, 如果不存在, 则创建
+			parentDir := filepath.Dir(targetPath)
+			if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+				if err := os.MkdirAll(parentDir, 0644); err != nil {
+					return fmt.Errorf("创建父目录失败: %w", err)
+				}
+			}
+
+			// 创建目标文件
 			fileWriter, err := os.OpenFile(targetPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode.Perm())
 			if err != nil {
 				return fmt.Errorf("创建文件失败: %w", err)
