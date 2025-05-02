@@ -812,7 +812,7 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, excludeF
 			multiWriter := io.MultiWriter(fileWriter, bar)
 
 			// 使用缓冲区进行文件复制，提高性能
-			buffer := make([]byte, 1024*1024) // 1MB 缓冲区
+			buffer := make([]byte, 512*1024) // 512KB 缓冲区大小
 			if _, err := io.CopyBuffer(multiWriter, file, buffer); err != nil {
 				return fmt.Errorf("写入 ZIP 文件失败: %w", err)
 			}
@@ -1019,7 +1019,7 @@ func Unzip(zipFilePath string, targetDir string) error {
 			progressWriter := io.MultiWriter(fileWriter, bar) // bar 是一个全局的进度条对象
 
 			// 使用 io.CopyBuffer 并指定缓冲区大小
-			buffer := make([]byte, 1024*1024) // 1MB 缓冲区
+			buffer := make([]byte, 512*1024) // 512KB 缓冲区大小
 			if _, err := io.CopyBuffer(progressWriter, zipFileReader, buffer); err != nil {
 				return fmt.Errorf("写入文件失败: %w", err)
 			}
