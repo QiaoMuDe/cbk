@@ -702,12 +702,34 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, excludeF
 
 		// 跳过目录本身
 		if !info.IsDir() {
-			// 累加文件大小
-			totalSize += info.Size()
+			// 获取文件的详细状态
+			fileStat, err := os.Lstat(path)
+			if err != nil {
+				return fmt.Errorf("获取文件状态失败: %w", err)
+			}
 
-			// 更新进度条
-			if err := iBar.Add64(info.Size()); err != nil {
-				return fmt.Errorf("更新进度条失败: %w", err)
+			// 根据文件类型处理
+			switch mode := fileStat.Mode(); {
+			case mode.IsRegular():
+				// 普通文件
+				totalSize += info.Size()
+
+				// 更新进度条
+				if err := iBar.Add64(info.Size()); err != nil {
+					return fmt.Errorf("更新进度条失败: %w", err)
+				}
+			case mode.IsDir():
+				// 目录，跳过
+				return nil
+			case mode&os.ModeSymlink != 0:
+				// 软链接，跳过
+				return nil
+			case mode&os.ModeDevice != 0:
+				// 设备文件，跳过
+				return nil
+			default:
+				// 其他特殊文件类型，跳过
+				return nil
 			}
 		}
 
@@ -786,15 +808,13 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, excludeF
 			}
 			defer file.Close()
 
+			// 创建一个自定义多路写入器，用于同时写入文件和进度条
+			multiWriter := io.MultiWriter(fileWriter, bar)
+
 			// 使用缓冲区进行文件复制，提高性能
 			buffer := make([]byte, 1024*1024) // 1MB 缓冲区
-			if _, err := io.CopyBuffer(fileWriter, file, buffer); err != nil {
+			if _, err := io.CopyBuffer(multiWriter, file, buffer); err != nil {
 				return fmt.Errorf("写入 ZIP 文件失败: %w", err)
-			}
-
-			// 更新进度条
-			if err := bar.Add64(info.Size()); err != nil {
-				return fmt.Errorf("更新进度条失败: %w", err)
 			}
 
 		case mode.IsDir():
