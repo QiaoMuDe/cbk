@@ -479,15 +479,22 @@ func filterFiles(files []FileWithModTime, retainDays, retainCount int) []FileWit
 				// 将文件按天分组
 				day := time.Date(file.ModTime.Year(), file.ModTime.Month(), file.ModTime.Day(), 0, 0, 0, 0, file.ModTime.Location())
 				dayMap[day] = append(dayMap[day], file)
+			} else {
+				// 如果文件的最后修改时间不在保留时间范围内，直接添加到filesToDelete中
+				filesToDelete = append(filesToDelete, file)
 			}
 		}
 
 		// 在每天分组中保留最新的retainCount个文件
 		for _, dayFiles := range dayMap {
-			// 检查每天分组的文件数量是否大于保留数量
+			// 按照文件的最后修改时间降序排序
+			sort.Slice(dayFiles, func(i, j int) bool {
+				return dayFiles[i].ModTime.After(dayFiles[j].ModTime)
+			})
+
+			// 如果每天分组的文件数量大于保留数量，则将超出的部分添加到filesToDelete中
 			if len(dayFiles) > retainCount {
-				// 如果大于保留数量，则将从0到len(dayFiles)-retainCount的文件添加到filesToDelete中
-				filesToDelete = append(filesToDelete, dayFiles[0:len(dayFiles)-retainCount]...)
+				filesToDelete = append(filesToDelete, dayFiles[retainCount:]...)
 			}
 		}
 
