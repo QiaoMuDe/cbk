@@ -2,6 +2,42 @@
 
 CBK 是一个基于命令行的备份管理工具，支持任务的添加、删除、编辑、运行、日志查看等功能。通过简单的命令行操作，用户可以轻松管理备份任务，并查看备份记录。
 
+## DeepWiKi介绍
+
+- 地址：[https://deepwiki.com/QiaoMuDe/cbk](https://deepwiki.com/QiaoMuDe/cbk)
+
+## 托管平台
+
+- Gitee：[https://gitee.com/MM-Q/cbk](https://gitee.com/MM-Q/cbk)
+- Github：[https://github.com/QiaoMuDe/cbk](https://github.com/QiaoMuDe/cbk)
+
+## 项目特点
+
+1. **丰富的子命令系统**
+   - 提供list/run/add/delete/edit/log/show/unpack/zip/unzip等完整备份管理命令
+   - 每个子命令都有详细的帮助文档和参数说明
+
+2. **表格输出样式多样化**
+   - 支持default/bold/colorbright/colordark/double/light/rounded等多种表格样式
+   - 可通过-ts参数快速切换显示风格
+
+3. **完善的帮助文档系统**
+   - 每个子命令都有独立的帮助文本(help_*.txt)
+   - 支持-h/--help参数查看详细帮助
+
+4. **数据库集成功能**
+   - 使用SQLite3存储备份任务和日志信息
+   - 自动初始化数据库和数据目录
+
+5. **灵活的备份任务管理**
+   - 支持通过ID或名称管理任务
+   - 可设置保留数量(c)和保留天数(d)
+   - 支持排除规则(ex)和压缩控制(nc)
+
+6. **版本控制集成**
+   - 内置版本信息显示功能(-v/-vv)
+   - 使用verman库管理版本号
+
 ## 安装
 
 1. 确保已安装 Go 语言环境（建议 Go 1.23.4 及以上版本）。
@@ -139,4 +175,4 @@ cbk - 命令行备份任务管理工具
 
 - [sqlx](https://github.com/jmoiron/sqlx)：用于数据库操作。
 - [go-pretty](https://github.com/jedib0t/go-pretty)：用于表格输出。
-- [colorlib](https://gitee.com/MM-Q/colorlib)：用于命令行颜色渲染。 
+- [colorlib](https://gitee.com/MM-Q/colorlib)：用于命令行颜色渲染。
