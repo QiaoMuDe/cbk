@@ -2,6 +2,7 @@ package tools
 
 import (
 	"archive/zip"
+	"bufio"
 	"cbk/pkg/globals"
 	"crypto/md5"
 	"errors"
@@ -198,8 +199,8 @@ func moveFile(src, dst string) error {
 	defer dstFile.Close()
 
 	// 拷贝内容
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return err
+	if _, copyErr := io.Copy(dstFile, srcFile); copyErr != nil {
+		return copyErr
 	}
 
 	// 获取源文件的 FileInfo
@@ -747,8 +748,8 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, excludeF
 	}
 
 	// 关闭不确定进度的进度条
-	if err := iBar.Finish(); err != nil {
-		return fmt.Errorf("关闭进度条失败: %w", err)
+	if iBarErr := iBar.Finish(); iBarErr != nil {
+		return fmt.Errorf("关闭进度条失败: %w", iBarErr)
 	}
 
 	// 初始化进度条
@@ -808,19 +809,32 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, excludeF
 				return fmt.Errorf("创建 ZIP 写入器失败: %w", err)
 			}
 
-			// 打开文件并写入 ZIP 包
+			// 打开文件
 			file, err := os.Open(path)
 			if err != nil {
 				return fmt.Errorf("打开文件失败: %w", err)
 			}
 			defer file.Close()
 
+			// 获取文件大小
+			fileInfo, err := file.Stat()
+			if err != nil {
+				return fmt.Errorf("获取文件信息失败: %w", err)
+			}
+			fileSize := fileInfo.Size()
+
+			// 根据文件大小设置缓冲区大小
+			bufferSize := getBufferSize(fileSize)
+
+			// 创建带缓冲的读取器
+			bufferedReader := bufio.NewReaderSize(file, bufferSize)
+
 			// 创建一个自定义多路写入器，用于同时写入文件和进度条
 			multiWriter := io.MultiWriter(fileWriter, bar)
 
 			// 使用缓冲区进行文件复制，提高性能
-			buffer := make([]byte, 512*1024) // 512KB 缓冲区大小
-			if _, err := io.CopyBuffer(multiWriter, file, buffer); err != nil {
+			buffer := make([]byte, bufferSize) // 动态分配缓冲区大小
+			if _, err := io.CopyBuffer(multiWriter, bufferedReader, buffer); err != nil {
 				return fmt.Errorf("写入 ZIP 文件失败: %w", err)
 			}
 
@@ -921,6 +935,36 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, excludeF
 	return nil
 }
 
+// getBufferSize 根据文件大小动态设置缓冲区大小。该函数会根据传入的文件大小，
+// 选择合适的缓冲区大小，以优化文件读写操作的性能。不同的文件大小范围对应不同的缓冲区大小。
+// 参数:
+//   - fileSize: 文件的大小，单位为字节，类型为 int64。
+//
+// 返回值:
+//   - 缓冲区的大小，单位为字节，类型为 int。
+func getBufferSize(fileSize int64) int {
+	switch {
+	// 当文件大小小于 512KB 时，设置缓冲区大小为 32KB
+	case fileSize < 512*1024:
+		return 32 * 1024
+	// 当文件大小小于 1MB 时，设置缓冲区大小为 64KB
+	case fileSize < 1*1024*1024:
+		return 64 * 1024
+	// 当文件大小小于 5MB 时，设置缓冲区大小为 128KB
+	case fileSize < 5*1024*1024:
+		return 128 * 1024
+	// 当文件大小小于 10MB 时，设置缓冲区大小为 256KB
+	case fileSize < 10*1024*1024:
+		return 256 * 1024
+	// 当文件大小小于 100MB 时，设置缓冲区大小为 512KB
+	case fileSize < 100*1024*1024:
+		return 512 * 1024
+	// 当文件大小大于等于 100MB 时，设置缓冲区大小为 1MB
+	default:
+		return 1024 * 1024
+	}
+}
+
 // Unzip 解压缩 ZIP 文件到指定目录
 // 参数:
 //   - zipFilePath: 要解压缩的 ZIP 文件路径
@@ -1016,18 +1060,28 @@ func Unzip(zipFilePath string, targetDir string) error {
 			}
 			defer fileWriter.Close()
 
+			// 打开 ZIP 文件中的文件
 			zipFileReader, err := file.Open()
 			if err != nil {
 				return fmt.Errorf("打开 ZIP 文件中的文件失败: %w", err)
 			}
 			defer zipFileReader.Close()
 
+			// 获取文件的大小
+			fileSize := file.UncompressedSize64
+
+			// 获取对应文件大小的缓冲区
+			bufferSize := getBufferSize(int64(fileSize))
+
+			// 包装读取器
+			readerBuffer := bufio.NewReaderSize(zipFileReader, bufferSize)
+
 			// 自定义写入器，用于更新进度条
 			progressWriter := io.MultiWriter(fileWriter, bar) // bar 是一个全局的进度条对象
 
 			// 使用 io.CopyBuffer 并指定缓冲区大小
-			buffer := make([]byte, 512*1024) // 512KB 缓冲区大小
-			if _, err := io.CopyBuffer(progressWriter, zipFileReader, buffer); err != nil {
+			buffer := make([]byte, bufferSize) // 动态分配缓冲区大小
+			if _, err := io.CopyBuffer(progressWriter, readerBuffer, buffer); err != nil {
 				return fmt.Errorf("写入文件失败: %w", err)
 			}
 		}
