@@ -6,6 +6,10 @@ import time
 import zipfile
 from datetime import datetime, timezone
 import platform
+import threading
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
+
 
 ############################### 以下为可配置的变量 #################################
 # 基础输出文件名(指定时无需包含后缀)同时也是注入的appName
@@ -26,6 +30,10 @@ DEFAULT_INJECT_GIT_INFO = True
 DEFAULT_SIMPLE_NAME = False
 # 是否将构建成功的可执行文件打包为zip文件, 默认为False
 DEFAULT_PACKAGE_ZIP = False
+# 批量构建时默认的并发线程数
+DEFAULT_CONCURRENCY = 4
+# 批量构建时默认的超时时间(秒)
+DEFAULT_TIMEOUT = 1800
 ####################################################################################
 
 
@@ -156,7 +164,7 @@ def run_gofmt(go_compiler):
         sys.exit(1)
 
 
-def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor_in_build):
+def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor_in_build, is_batch=False):
     """组装并执行构建命令"""
     command = [go_compiler, "build", "-o", output_file, "-ldflags", ldflags]
     if use_vendor_in_build:
@@ -197,7 +205,9 @@ def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor_in_bu
 
         # 使用指定的链接器标志和环境变量进行构建
         subprocess.run(command, capture_output=True, text=True, check=True, env=env)
-        print_success(f"构建成功，输出文件：{output_file}")
+        
+        if not is_batch:
+            print_success(f"构建成功，输出文件：{output_file}")
         return True
     except subprocess.CalledProcessError as e:
         print_error("构建失败：")
@@ -205,10 +215,11 @@ def build_go_app(go_compiler, output_file, entry_file, ldflags, use_vendor_in_bu
         return False
 
 
-def zip_executable(output_file, zip_file):
+def zip_executable(output_file, zip_file, is_batch=False):
     """将构建成功的可执行文件打包到 ZIP 文件中"""
     try:
-        print_success(f"正在将 {output_file} 打包到 {zip_file} 中...")
+        if not is_batch:
+            print_success(f"{output_file} --> {zip_file}")
         with zipfile.ZipFile(zip_file, "w", zipfile.ZIP_DEFLATED) as zipf:
             zipf.write(output_file)
 
@@ -219,13 +230,16 @@ def zip_executable(output_file, zip_file):
     except Exception as e:
         print_error(f"打包到 {zip_file} 失败：{str(e)}")
 
-
 def batch_build(args):
     """批量构建所有支持的平台和架构组合"""
     print_success("开始批量构建所有支持的平台和架构组合...")
     total_start_time = time.time()
     success_count = 0
     fail_count = 0
+    skip_count = 0
+    total_tasks = len(SUPPORTED_PLATFORMS) * len(SUPPORTED_ARCHITECTURES)
+    print_success(f"总任务数: {total_tasks}")
+    lock = threading.Lock()
 
     # 执行构建前的检查工作
     print_success("开始检查构建环境...")
@@ -242,59 +256,88 @@ def batch_build(args):
     # 创建临时args对象用于批量构建
     batch_args = argparse.Namespace(**vars(args))
 
-    for system in SUPPORTED_PLATFORMS:
-        for architecture in SUPPORTED_ARCHITECTURES:
-            # 跳过不支持的darwin/386和darwin/arm组合
-            if system == "darwin" and architecture in ("386", "arm"):
-                print_success(f"跳过不支持的架构组合: {system}/{architecture}")
-                continue
+    def build_task(system, architecture):
+        nonlocal success_count, fail_count, skip_count
+        # 跳过不支持的darwin/386和darwin/arm组合
+        if system == "darwin" and architecture in ("386", "arm"):
+            with lock:
+                skip_count += 1
+                print_success(f"跳过不支持的平台/架构组合: {system}/{architecture}")
+            return
 
-            batch_args.platform = system
-            batch_args.arch = architecture
+        batch_args.platform = system
+        batch_args.arch = architecture
 
-            # 检查架构组合是否支持
-            if parse_arguments() is None:
-                continue
+        # 检查架构组合是否支持
+        if parse_arguments() is None:
+            return
 
-            print_success(f"正在构建 {system}/{architecture}...")
+        # 如果使用简单文件名格式，则生成输出文件名时不包含系统和架构信息
+        if args.simple_name:
+            base_name = f"{BASE_OUTPUT_NAME}"
+            git_version = _git_info_cache["version"] if args.git else None
+            output_file = generate_output_file_name(base_name, system, git_version)
+        else:
+            base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
+            git_version = _git_info_cache["version"] if args.git else None
+            output_file = generate_output_file_name(base_name, system, git_version)
 
-            # 如果使用简单文件名格式，则生成输出文件名时不包含系统和架构信息
-            if args.simple_name:
-                base_name = f"{BASE_OUTPUT_NAME}"
+        # 生成zip文件名
+        if args.zip:
+            if args.zip_file is None:
                 git_version = _git_info_cache["version"] if args.git else None
-                output_file = generate_output_file_name(base_name, system, git_version)
+                zip_file = generate_zip_file_name(
+                        BASE_OUTPUT_NAME,
+                        system,
+                        architecture,
+                        git_version
+                    )
             else:
-                base_name = f"{BASE_OUTPUT_NAME}_{system}_{architecture}"
-                git_version = _git_info_cache["version"] if args.git else None
-                output_file = generate_output_file_name(base_name, system, git_version)
+                zip_file = args.zip_file
+        else:
+            zip_file = None
 
-            # 生成zip文件名
-            if args.zip:
-                if args.zip_file is None:
-                    git_version = _git_info_cache["version"] if args.git else None
-                    zip_file = generate_zip_file_name(
-                            BASE_OUTPUT_NAME,
-                            system,
-                            architecture,
-                            git_version
-                        )
-                else:
-                    zip_file = args.zip_file
-            else:
-                zip_file = None
-
+        try:
             # 执行构建
             build_result = single_build(
                 args, system, architecture, output_file, zip_file
             )
-
-            if build_result:
-                success_count += 1
-            else:
+            
+            with lock:
+                if build_result:
+                    success_count += 1
+                else:
+                    fail_count += 1
+                completed_count = success_count + fail_count
+                print_success(f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个)")
+                pass
+        except Exception as e:
+            with lock:
                 fail_count += 1
+                completed_count = success_count + fail_count
+                print_success(f"已完成 {completed_count}/{total_tasks} 个任务 (成功 {success_count} 个，失败 {fail_count} 个)")
+                print_error(f"构建 {system}/{architecture} 时发生异常: {str(e)}")
 
+    # 创建线程池
+    with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
+        # 提交所有构建任务
+        futures = []
+        for system in SUPPORTED_PLATFORMS:
+            for architecture in SUPPORTED_ARCHITECTURES:
+                futures.append(executor.submit(build_task, system, architecture))
+        
+        # 等待所有任务完成，设置超时时间为30分钟
+        try:
+            for future in futures:
+                future.result(timeout=args.timeout)
+        except concurrent.futures.TimeoutError:
+            print_error("任务执行超时，强制终止线程池")
+            executor._threads.clear()
+            concurrent.futures.thread._threads_queues.clear()
+            fail_count += len([f for f in futures if not f.done()])
+            
     total_elapsed_time = time.time() - total_start_time
-    print_success(f"批量构建完成，成功 {success_count} 个，失败 {fail_count} 个")
+    print_success(f"批量构建完成，成功 {success_count} 个，失败 {fail_count} 个，跳过 {skip_count} 个")
     print_success(f"总耗时: {total_elapsed_time:.2f} 秒")
 
 
@@ -325,11 +368,11 @@ def single_build(args, system, architecture, output_file, zip_file):
 
         # 执行构建
         build_result = build_go_app(
-            args.go_compiler, output_file, args.entry, ldflags, args.use_vendor_in_build
+            args.go_compiler, output_file, args.entry, ldflags, args.use_vendor_in_build, True
         )
 
         if build_result and args.zip and zip_file:
-            zip_executable(output_file, zip_file)
+            zip_executable(output_file, zip_file, True)
 
         return build_result
     except Exception as e:
@@ -478,12 +521,6 @@ def parse_arguments():
     )
     parser.add_argument("--zip-file", help="指定打包输出的 ZIP 文件名", default=None)
     parser.add_argument(
-        "--delete-after-zip",
-        action="store_true",
-        help="打包完成后删除源可执行文件",
-        default=False,
-    )
-    parser.add_argument(
         "-git",
         action="store_true",
         help="在构建时注入 Git 仓库的版本信息",
@@ -514,6 +551,20 @@ def parse_arguments():
         help="启用批量构建模式，构建所有支持的平台和架构组合",
         default=False,
     )
+    parser.add_argument(
+        "-w",
+        "--max-workers",
+        type=int,
+        help="批量构建模式下的最大并发线程数",
+        default=DEFAULT_CONCURRENCY,
+    )
+    parser.add_argument(
+        "-t",
+        "--timeout",
+        type=int,
+        help="批量构建模式下每个任务的超时时间(秒), 默认30分钟(1800秒)",
+        default=DEFAULT_TIMEOUT,
+    )
     args = parser.parse_args()  # 解析命令行参数
 
     # 处理平台简写
@@ -539,6 +590,11 @@ def main():
 
     # 解析命令行参数
     args = parse_arguments()
+    
+    # 检查批量构建模式下是否启用了简单文件名格式
+    if args.batch and args.simple_name:
+        print_error("批量构建模式下不能使用简单文件名格式，请移除-s/--simple-name参数")
+        return None
     
     # 如果启用了git标志，提前获取git信息
     if args.git:
@@ -636,13 +692,14 @@ def main():
     # 执行构建命令
     print_success("开始构建...")
     build_result = build_go_app(
-        go_compiler, output_file, entry_file, ldflags, args.use_vendor_in_build
+        go_compiler, output_file, entry_file, ldflags, args.use_vendor_in_build, args.batch
     )
 
     if build_result:
-        print_success("构建完成。")
+        if not args.batch:
+            print_success("构建完成。")
         if zip_flag:
-            zip_executable(output_file, zip_file)
+            zip_executable(output_file, zip_file, args.batch)
     else:
         print_error("构建失败，请检查错误信息。")
 
