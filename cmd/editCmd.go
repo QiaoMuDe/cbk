@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // editCmdMain 编辑任务
@@ -165,8 +166,9 @@ func editTask(db *sqlx.DB, ids []int) error {
 		if _, err := db.Exec(updateSql, task.TaskName, task.RetentionCount, task.RetentionDays, task.BackupDirectory, task.NoCompression, task.ExcludeRules, id); err != nil {
 			// 更新任务失败
 			if *editNewDirName != "" {
-				if err := tools.RenameBackupDirectory(rootPath, newDirName, oldDirName); err != nil {
-					CL.PrintErrf("更新任务失败且恢复备份目录失败: %v", err)
+				// 为避免变量名冲突，将错误变量名改为 renameErr
+				if renameErr := tools.RenameBackupDirectory(rootPath, newDirName, oldDirName); renameErr != nil {
+					CL.PrintErrf("更新任务失败且恢复备份目录失败: %v", renameErr)
 					continue
 				}
 				CL.PrintOkf("更新任务失败, 已恢复备份目录: %s", filepath.Join(rootPath, oldDirName))

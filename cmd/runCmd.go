@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -147,8 +148,8 @@ func runTask(db *sqlx.DB, ids []int) error {
 		zipPath, err := tools.CreateZipFromOSPaths(db, targetDir, targetName, backupFileNamePath, task.NoCompression, excludeFunc)
 		if err != nil {
 			// 插入备份记录
-			if _, err := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
-				CL.PrintErrf("插入备份记录失败: %v", err)
+			if _, execErr := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); execErr != nil {
+				CL.PrintErrf("插入备份记录失败: %v", execErr)
 				continue
 			}
 			CL.PrintErrf("备份 %s 任务失败: %v", task.TaskName, err)
@@ -159,8 +160,8 @@ func runTask(db *sqlx.DB, ids []int) error {
 		backupFileMD5, err := tools.GetFileMD5Last8(zipPath)
 		if err != nil {
 			// 插入备份记录
-			if _, err := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
-				CL.PrintErrf("插入备份记录失败: %v", err)
+			if _, execErr := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); execErr != nil {
+				CL.PrintErrf("插入备份记录失败: %v", execErr)
 				continue
 			}
 			CL.PrintErrf("获取备份文件MD5失败: %v", err)
@@ -171,8 +172,8 @@ func runTask(db *sqlx.DB, ids []int) error {
 		backupFileSize, err := tools.HumanReadableSize(zipPath)
 		if err != nil {
 			// 插入备份记录
-			if _, err := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); err != nil {
-				CL.PrintErrf("插入备份记录失败: %v", err)
+			if _, execErr := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); execErr != nil {
+				CL.PrintErrf("插入备份记录失败: %v", execErr)
 				continue
 			}
 			CL.PrintErrf("获取备份文件大小失败: %v", err)
@@ -180,8 +181,8 @@ func runTask(db *sqlx.DB, ids []int) error {
 		}
 
 		// 插入备份记录
-		if _, err := db.Exec(insertSql, versionID, id, backupTime, task.TaskName, "true", filepath.Base(zipPath), backupFileSize, task.BackupDirectory, backupFileMD5); err != nil {
-			CL.PrintErrf("插入备份记录失败: %v", err)
+		if _, execErr := db.Exec(insertSql, versionID, id, backupTime, task.TaskName, "true", filepath.Base(zipPath), backupFileSize, task.BackupDirectory, backupFileMD5); execErr != nil {
+			CL.PrintErrf("插入备份记录失败: %v", execErr)
 			continue
 		}
 

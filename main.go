@@ -4,10 +4,7 @@ package main
 import (
 	"cbk/cmd"
 	"cbk/pkg/tools"
-	_ "embed"
 	"os"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // 入口点

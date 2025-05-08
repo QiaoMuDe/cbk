@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/jmoiron/sqlx"
 )
 

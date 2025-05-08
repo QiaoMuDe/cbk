@@ -13,6 +13,7 @@ import (
 	"gitee.com/MM-Q/verman"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // 定义全局颜色渲染器
