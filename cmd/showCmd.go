@@ -7,10 +7,10 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // showCmdMain 查询指定任务ID的备份记录并以表格形式输出

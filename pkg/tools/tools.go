@@ -18,8 +18,8 @@ import (
 	"unicode"
 
 	"gitee.com/MM-Q/colorlib"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/schollz/progressbar/v3"
 )
 
