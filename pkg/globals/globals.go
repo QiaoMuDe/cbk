@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	CbkHomeDir = ".cbk"   // 数据目录
-	CbkDBFile  = "cbk.db" // 数据库文件
-	CbkDataDir = "data"   // 数据目录
+	CbkHomeDir       = ".cbk"       // 数据目录
+	CbkDBFile        = "cbk.db"     // 数据库文件
+	CbkDataDir       = "data"       // 数据目录
+	OneKeyScriptName = "onekey_bak" // 一键脚本名称
 )
 
 // 数据库文件路径

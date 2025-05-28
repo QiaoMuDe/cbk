@@ -5,6 +5,7 @@ import (
 	"cbk/pkg/tools"
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -106,9 +107,22 @@ func runTask(db *sqlx.DB, ids []int) error {
 		}
 
 		// 检查目标目录或文件是否存在
-		if _, err := tools.CheckPath(task.TargetDirectory); err != nil {
+		if info, err := tools.CheckPath(task.TargetDirectory); err != nil {
 			CL.PrintErrf("目标目录或文件不存在: %v", err)
 			continue
+		} else if info.IsDir {
+			// 检查目标目录内是否存在文件
+			entry, err := os.ReadDir(task.TargetDirectory)
+			if err != nil {
+				CL.PrintErrf("读取目标目录失败: %v", err)
+				continue
+			}
+
+			// 检查目标目录内是否存在文件
+			if len(entry) == 0 {
+				CL.PrintErrf("目标目录为空, 跳过备份: %s", task.TargetDirectory)
+				continue
+			}
 		}
 
 		// 检查备份目录是否存在

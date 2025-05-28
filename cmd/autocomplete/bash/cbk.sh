@@ -146,7 +146,7 @@ _cbk() {
         ;;
     init)
         # 如果前一个单词是 init, 补全 init 命令的选项
-        sub_opts="-type -h"
+        sub_opts="-t -h -o"
         COMPREPLY=($(compgen -W "${sub_opts}" -- ${cur}))
         return 0
         ;;
@@ -185,10 +185,10 @@ _cbk() {
         return 0
     fi
 
-    # 如果前一个单词是 -type, 补全类型
-    if [[ ${prev} == "-type" ]] || [[ ${prev} == "--type" ]]; then
+    # 如果前一个单词是 -t, 补全类型
+    if [[ ${prev} == "-t" ]] || [[ ${prev} == "-t" ]]; then
         # 定义所有可用的类型
-        local completion_types="bash addtask"
+        local completion_types="bash addtask b at onekey ok"
         COMPREPLY=($(compgen -W "${completion_types}" -- ${cur}))
         return 0
     fi

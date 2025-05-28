@@ -4,6 +4,7 @@ import (
 	"cbk/pkg/globals"
 	"cbk/pkg/tools"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -53,8 +54,18 @@ func zipCmdMain() error {
 	}
 
 	// 检查指定的目录路径是否存在
-	if _, err := tools.CheckPath(*zipTarget); err != nil {
+	if info, err := tools.CheckPath(*zipTarget); err != nil {
 		return fmt.Errorf("指定的目录路径不存在: %s", *zipTarget)
+	} else if info.IsDir {
+		// 检查目录是否为空
+		entry, err := os.ReadDir(*zipTarget)
+		if err != nil {
+			return fmt.Errorf("读取目录失败: %s", *zipTarget)
+		}
+
+		if len(entry) == 0 {
+			return fmt.Errorf("指定的目录为空, 跳过打包: %s", *zipTarget)
+		}
 	}
 
 	// 获取过滤函数

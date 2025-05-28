@@ -13,7 +13,6 @@ func main() {
 	defer func() {
 		if err := recover(); err != nil {
 			tools.CL.PrintErrf("程序发生异常: %v", err)
-			tools.CL.PrintErr("程序退出")
 			os.Exit(1)
 		}
 	}()
@@ -21,7 +20,6 @@ func main() {
 	// 运行程序
 	if err := cmd.AppRun(); err != nil {
 		tools.CL.PrintErrf("程序发生错误: %v", err)
-		tools.CL.PrintErr("程序退出")
 		os.Exit(1)
 	}
 
