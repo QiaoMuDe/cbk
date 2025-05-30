@@ -1109,7 +1109,7 @@ func ContainsSpecialChars(s string) bool {
 		'/': true, '?': true, ':': true, '，': true, '。': true, '？': true, '！': true,
 		'；': true, '：': true, '‘': true, '’': true, '“': true, '”': true, '（': true,
 		'）': true, '【': true, '】': true, '《': true, '》': true, '…': true, '—': true,
-		'～': true, '￥': true, '·': true, '、': true,
+		'～': true, '￥': true, '·': true, '、': true, '_': true,
 	}
 
 	// 遍历字符串中的每个字符
