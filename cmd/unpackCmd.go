@@ -14,12 +14,12 @@ import (
 // unpackCmdMain 解压指定备份任务
 func unpackCmdMain(db *sqlx.DB) error {
 	// 检查任务ID是否指定
-	if *unpackID == 0 {
+	if unpackID.Get() == 0 {
 		return fmt.Errorf("解压指定备份任务时, 必须指定任务ID")
 	}
 
 	// 检查versionID是否指定
-	if *unpackVersionID == "" {
+	if unpackVersionID.Get() == "" {
 		return fmt.Errorf("解压指定备份任务时, 必须指定版本ID")
 	}
 
@@ -28,22 +28,22 @@ func unpackCmdMain(db *sqlx.DB) error {
 
 	// 检查*unpackID是否是已存在的
 	var taskCount int
-	if err := db.Get(&taskCount, "SELECT COUNT(*) FROM backup_records WHERE task_id = ?;", *unpackID); err == sql.ErrNoRows {
-		return fmt.Errorf("未找到指定任务ID %d 的备份记录", *unpackID)
+	if err := db.Get(&taskCount, "SELECT COUNT(*) FROM backup_records WHERE task_id = ?;", unpackID.Get()); err == sql.ErrNoRows {
+		return fmt.Errorf("未找到指定任务ID %d 的备份记录", unpackID.Get())
 	} else if err != nil {
 		return fmt.Errorf("查询备份记录失败: %w", err)
 	} else if taskCount == 0 {
-		return fmt.Errorf("未找到指定任务ID %d 的备份记录", *unpackID)
+		return fmt.Errorf("未找到指定任务ID %d 的备份记录", unpackID.Get())
 	}
 
 	// 检查versionID是否是已存在的
 	var versionCount int
-	if err := db.Get(&versionCount, "SELECT COUNT(*) FROM backup_records WHERE version_id = ?;", *unpackVersionID); err == sql.ErrNoRows {
-		return fmt.Errorf("未找到指定版本ID %s 的备份记录", *unpackVersionID)
+	if err := db.Get(&versionCount, "SELECT COUNT(*) FROM backup_records WHERE version_id = ?;", unpackVersionID.Get()); err == sql.ErrNoRows {
+		return fmt.Errorf("未找到指定版本ID %s 的备份记录", unpackVersionID.Get())
 	} else if err != nil {
 		return fmt.Errorf("查询备份记录失败: %w", err)
 	} else if versionCount == 0 {
-		return fmt.Errorf("未找到指定版本ID %s 的备份记录", *unpackVersionID)
+		return fmt.Errorf("未找到指定版本ID %s 的备份记录", unpackVersionID.Get())
 	}
 
 	// 构建查询sql语句
@@ -53,8 +53,8 @@ func unpackCmdMain(db *sqlx.DB) error {
 	var record globals.BackupRecord
 
 	// 执行查询
-	if err := db.Get(&record, querySql, *unpackID, *unpackVersionID); err == sql.ErrNoRows {
-		return fmt.Errorf("未找到指定任务ID %d 和版本ID %s 的备份记录", *unpackID, *unpackVersionID)
+	if err := db.Get(&record, querySql, unpackID.Get(), unpackVersionID.Get()); err == sql.ErrNoRows {
+		return fmt.Errorf("未找到指定任务ID %d 和版本ID %s 的备份记录", unpackID.Get(), unpackVersionID.Get())
 	} else if err != nil {
 		return fmt.Errorf("查询备份记录失败: %w", err)
 	}
@@ -78,7 +78,7 @@ func unpackCmdMain(db *sqlx.DB) error {
 	}
 
 	// 执行解压操作
-	if unZipPath, err := tools.UncompressFilesByOS(record.BackupPath, record.BackupFileName, *unpackOutput); err != nil {
+	if unZipPath, err := tools.UncompressFilesByOS(record.BackupPath, record.BackupFileName, unpackOutput.Get()); err != nil {
 		return fmt.Errorf("解压备份文件失败: %w", err)
 	} else {
 		// 打印提示信息

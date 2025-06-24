@@ -114,28 +114,28 @@ var (
 	showID         *qflag.IntFlag
 	showView       *qflag.BoolFlag
 	showTableStyle *qflag.EnumFlag
+
+	// 子命令: unpack
+	unpackCmd       *qflag.Cmd
+	unpackID        *qflag.IntFlag
+	unpackVersionID *qflag.StringFlag
+	unpackOutput    *qflag.StringFlag
+
+	// 子命令: zip
+	zipCmd           *qflag.Cmd
+	zipOutput        *qflag.StringFlag
+	zipTarget        *qflag.StringFlag
+	zipNoCompression *qflag.IntFlag
+	zipExcludeRules  *qflag.StringFlag
+
+	// 子命令: unzip
+	unzipCmd       *qflag.Cmd
+	unzipFile      *qflag.StringFlag
+	unzipOutputDir *qflag.StringFlag
 )
 
 // 定义子命令及其参数
 var (
-	// 子命令: unpack
-	unpackCmd       = flag.NewFlagSet("unpack", flag.ExitOnError)
-	unpackID        = unpackCmd.Int("id", 0, "任务ID")
-	unpackVersionID = unpackCmd.String("v", "", "指定解压的版本ID")
-	unpackOutput    = unpackCmd.String("o", ".", "指定输出的路径(默认当前目录)")
-
-	// 子命令: zip
-	zipCmd           = flag.NewFlagSet("zip", flag.ExitOnError)
-	zipOutput        = zipCmd.String("o", "未命名.zip", "指定输出的压缩包名(默认: 未命名.zip)")
-	zipTarget        = zipCmd.String("t", "", "指定要打包的目标路径")
-	zipNoCompression = zipCmd.Int("nc", 0, "是否禁用压缩（默认启用压缩）")
-	zipExcludeRules  = zipCmd.String("ex", "none", "指定要排除的目录名、文件名、扩展名, 用于排除备份文件, 支持通配符模式")
-
-	// 子命令: unzip
-	unzipCmd       = flag.NewFlagSet("unzip", flag.ExitOnError)
-	unzipFile      = unzipCmd.String("f", "", "指定要解压的压缩文件名")
-	unzipOutputDir = unzipCmd.String("d", ".", "指定解压的目标路径。如果未指定，则解压到当前目录")
-
 	// 子命令: version
 	versionCmd = flag.NewFlagSet("version", flag.ExitOnError)
 
@@ -235,8 +235,32 @@ func init() {
 	showView = showCmd.Bool("view", "v", false, "是否显示详细信息")
 	showTableStyle = showCmd.Enum("table-style", "ts", "df", "指定表格样式", globals.TableStyleList)
 
+	// 子命令: unpack
+	unpackCmd = qflag.NewCmd("unpack", "up", flag.ExitOnError)
+	unpackCmd.SetUseChinese(true) // 设置使用中文
+	unpackCmd.SetDescription("根据指定的任务ID解压指定版本的备份文件")
+	unpackID = unpackCmd.Int("id", "", 0, "任务ID")
+	unpackVersionID = unpackCmd.String("vid", "v", "", "指定解压的版本ID")
+	unpackOutput = unpackCmd.String("output", "o", ".", "指定输出的路径(默认当前目录)")
+
+	// 子命令: zip
+	zipCmd = qflag.NewCmd("zip", "z", flag.ExitOnError)
+	zipCmd.SetUseChinese(true) // 设置使用中文
+	zipCmd.SetDescription("将指定的目标路径打包为一个压缩文件")
+	zipOutput = zipCmd.String("output", "o", "未命名.zip", "指定输出的压缩包名(默认: 未命名.zip)")
+	zipTarget = zipCmd.String("target", "t", "", "指定要打包的目标路径")
+	zipNoCompression = zipCmd.Int("nc", "", 0, "是否禁用压缩(0: 启用压缩, 1: 禁用压缩)")
+	zipExcludeRules = zipCmd.String("ex", "", "none", "指定要排除的目录名、文件名、扩展名, 用于排除备份文件, 支持通配符模式")
+
+	// 子命令: unzip
+	unzipCmd = qflag.NewCmd("unzip", "uz", flag.ExitOnError)
+	unzipCmd.SetUseChinese(true) // 设置使用中文
+	unpackCmd.SetDescription("解压指定的压缩文件到目标路径。如果未指定目标路径，则解压到当前目录")
+	unzipFile = unzipCmd.String("file", "f", "", "指定要解压的压缩文件名")
+	unzipOutputDir = unzipCmd.String("dir", "d", ".", "指定解压的目标路径。如果未指定，则解压到当前目录")
+
 	// 添加子命令
-	if addErr := qflag.AddSubCmd(listCmd, runCmd, addCmd, deleteCmd, editCmd, logCmd, showCmd); addErr != nil {
+	if addErr := qflag.AddSubCmd(listCmd, runCmd, addCmd, deleteCmd, editCmd, logCmd, showCmd, unpackCmd, zipCmd, unzipCmd); addErr != nil {
 		fmt.Printf("err: 添加子命令失败: %s\n", addErr)
 		os.Exit(1)
 	}

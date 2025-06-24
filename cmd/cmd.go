@@ -180,61 +180,19 @@ func executeCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("查看指定备份任务的信息失败: %v", err)
 		}
 		return nil
-	case "unpack":
-		// 解析unpack命令的参数
-		if err := unpackCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析unpack命令参数失败: %v", err)
-		}
+	case unpackCmd.LongName(), unpackCmd.ShortName(): // unpack命令
 		// 执行unpack命令的逻辑
 		if err := unpackCmdMain(db); err != nil {
 			return fmt.Errorf("解压备份任务失败: %v", err)
 		}
 		return nil
-	case "u":
-		// 解析unpack命令的参数
-		if err := unpackCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析unpack命令参数失败: %v", err)
-		}
-		// 执行unpack命令的逻辑
-		if err := unpackCmdMain(db); err != nil {
-			return fmt.Errorf("解压备份任务失败: %v", err)
-		}
-		return nil
-	case "zip":
-		// 解析zip命令的参数
-		if err := zipCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析zip命令参数失败: %v", err)
-		}
+	case zipCmd.LongName(), zipCmd.ShortName(): // zip命令
 		// 执行zip命令的逻辑
 		if err := zipCmdMain(); err != nil {
 			return fmt.Errorf("打包ZIP文件失败: %v", err)
 		}
 		return nil
-	case "z":
-		// 解析zip命令的参数
-		if err := zipCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析zip命令参数失败: %v", err)
-		}
-		// 执行zip命令的逻辑
-		if err := zipCmdMain(); err != nil {
-			return fmt.Errorf("打包ZIP文件失败: %v", err)
-		}
-		return nil
-	case "unzip":
-		// 解析unzip命令的参数
-		if err := unzipCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析unzip命令参数失败: %v", err)
-		}
-		// 执行unzip命令的逻辑
-		if err := unzipCmdMain(); err != nil {
-			return fmt.Errorf("解压ZIP文件失败: %v", err)
-		}
-		return nil
-	case "uz":
-		// 解析unzip命令的参数
-		if err := unzipCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析unzip命令参数失败: %v", err)
-		}
+	case unzipCmd.LongName(), unzipCmd.ShortName(): // unzip命令
 		// 执行unzip命令的逻辑
 		if err := unzipCmdMain(); err != nil {
 			return fmt.Errorf("解压ZIP文件失败: %v", err)
