@@ -17,9 +17,9 @@ func deleteCmdMain(db *sqlx.DB) error {
 	var ids []int
 
 	// 如果指定了多个任务ID, 则执行多任务模式
-	if *deleteIDS != "" {
+	if deleteIDS.Get() != "" {
 		// 解析多个任务ID
-		for _, idStr := range strings.Split(*deleteIDS, ",") {
+		for _, idStr := range strings.Split(deleteIDS.Get(), ",") {
 			// 检查解析的任务ID是否为空
 			if idStr == "" {
 				CL.PrintErr("任务ID不能为空")
@@ -52,7 +52,7 @@ func deleteCmdMain(db *sqlx.DB) error {
 	}
 
 	// 如果指定了单个任务ID, 则执行单任务模式(单任务模式支持：删除任务，删除指定版本的备份)
-	if *deleteID != 0 || *deleteName != "" {
+	if deleteID.Get() != 0 || deleteName.Get() != "" {
 		// 执行任务
 		if err := deleteTask(db); err != nil {
 			return fmt.Errorf("删除任务失败: %w", err)
@@ -62,7 +62,7 @@ func deleteCmdMain(db *sqlx.DB) error {
 	}
 
 	// 检查必要的参数是否指定
-	if *deleteID == 0 && *deleteIDS == "" && *deleteName == "" {
+	if deleteID.Get() == 0 && deleteIDS.Get() == "" && deleteName.Get() == "" {
 		return fmt.Errorf("删除备份任务时, 必须指定任务ID或者任务名, 使用-id指定任务ID或-n指定任务名称或用-ids指定多个任务ID, 例如: -ids '1,2,3'")
 	}
 
@@ -72,26 +72,26 @@ func deleteCmdMain(db *sqlx.DB) error {
 // 单ID模式删除任务
 func deleteTask(db *sqlx.DB) error {
 	// 检查是否指定任务ID和任务名
-	if *deleteName == "" && *deleteID == 0 {
+	if deleteName.Get() == "" && deleteID.Get() == 0 {
 		return fmt.Errorf("必须指定要删除的任务, 请使用-id指定任务ID或-n指定任务名称")
 	}
 
 	// 如果版本ID不为空, 但是则检查是否指定了任务ID或任务名
-	if *deleteVersionID != "" && (*deleteID == 0 && *deleteName == "") {
+	if deleteVersionID.Get() != "" && (deleteID.Get() == 0 && deleteName.Get() == "") {
 		return fmt.Errorf("删除指定版本的备份时, 必须指定任务ID或任务名, 使用-id指定任务ID或-n指定任务名称")
 	}
 
 	// 检查是否同时指定了任务ID和任务名
-	if *deleteID != 0 && *deleteName != "" {
+	if deleteID.Get() != 0 && deleteName.Get() != "" {
 		return fmt.Errorf("不能同时使用-id和-n参数, 请选择其中一种方式指定任务")
 	}
 
 	// 根据任务名删除任务
-	if *deleteName != "" && *deleteVersionID == "" {
+	if deleteName.Get() != "" && deleteVersionID.Get() == "" {
 		var backupDir string
 		backupDirSql := "SELECT backup_directory FROM backup_tasks WHERE task_name = ?"
-		if err := db.Get(&backupDir, backupDirSql, *deleteName); err == sql.ErrNoRows {
-			return fmt.Errorf("任务名不存在: %s", *deleteName)
+		if err := db.Get(&backupDir, backupDirSql, deleteName.Get()); err == sql.ErrNoRows {
+			return fmt.Errorf("任务名不存在: %s", deleteName.Get())
 		} else if err != nil {
 			return fmt.Errorf("获取备份存放目录失败: %w", err)
 		}
@@ -103,24 +103,24 @@ func deleteTask(db *sqlx.DB) error {
 
 		// 删除任务和备份记录
 		deleteSql := "DELETE FROM backup_tasks WHERE task_name = ?"
-		if _, err := db.Exec(deleteSql, *deleteName); err != nil {
+		if _, err := db.Exec(deleteSql, deleteName.Get()); err != nil {
 			return fmt.Errorf("删除任务失败: %w", err)
 		}
 		deleteBackupSql := "DELETE FROM backup_records WHERE task_name = ?"
-		if _, err := db.Exec(deleteBackupSql, *deleteName); err != nil {
+		if _, err := db.Exec(deleteBackupSql, deleteName.Get()); err != nil {
 			return fmt.Errorf("删除备份记录失败: %w", err)
 		}
 
-		CL.PrintOkf("任务删除成功: %s\n", *deleteName)
+		CL.PrintOkf("任务删除成功: %s\n", deleteName.Get())
 		return nil
 	}
 
 	// 根据任务ID删除任务
-	if *deleteID != 0 && *deleteVersionID == "" {
+	if deleteID.Get() != 0 && deleteVersionID.Get() == "" {
 		var backupDir string
 		backupDirSql := "SELECT backup_directory FROM backup_tasks WHERE task_id = ?"
-		if err := db.Get(&backupDir, backupDirSql, *deleteID); err == sql.ErrNoRows {
-			return fmt.Errorf("任务ID不存在: %d", *deleteID)
+		if err := db.Get(&backupDir, backupDirSql, deleteID.Get()); err == sql.ErrNoRows {
+			return fmt.Errorf("任务ID不存在: %d", deleteID.Get())
 		} else if err != nil {
 			return fmt.Errorf("获取备份存放目录失败: %w", err)
 		}
@@ -132,27 +132,27 @@ func deleteTask(db *sqlx.DB) error {
 
 		// 删除任务和备份记录
 		deleteSql := "DELETE FROM backup_tasks WHERE task_id = ?"
-		if _, err := db.Exec(deleteSql, *deleteID); err != nil {
+		if _, err := db.Exec(deleteSql, deleteID.Get()); err != nil {
 			return fmt.Errorf("删除任务失败: %w", err)
 		}
 		deleteBackupSql := "DELETE FROM backup_records WHERE task_id = ?"
-		if _, err := db.Exec(deleteBackupSql, *deleteID); err != nil {
+		if _, err := db.Exec(deleteBackupSql, deleteID.Get()); err != nil {
 			return fmt.Errorf("删除备份记录失败: %w", err)
 		}
 
-		CL.PrintOkf("任务ID删除成功: %d\n", *deleteID)
+		CL.PrintOkf("任务ID删除成功: %d\n", deleteID.Get())
 		return nil
 	}
 
 	// 根据任务ID和版本ID删除备份记录
-	if *deleteID != 0 && *deleteVersionID != "" {
+	if deleteID.Get() != 0 && deleteVersionID.Get() != "" {
 		// 获取根据任务ID和版本ID查询备份记录
 		var backupRecord struct {
 			BackupPath string `db:"backup_path"`      // 备份目录
 			BackupFile string `db:"backup_file_name"` // 备份文件
 		}
 		backupRecordSql := "select backup_path, backup_file_name from backup_records where task_id =? and version_id =?"
-		if err := db.Get(&backupRecord, backupRecordSql, *deleteID, *deleteVersionID); err == sql.ErrNoRows {
+		if err := db.Get(&backupRecord, backupRecordSql, deleteID.Get(), deleteVersionID.Get()); err == sql.ErrNoRows {
 			return fmt.Errorf("任务ID或版本ID不存在")
 		} else if err != nil {
 			return fmt.Errorf("查询备份记录失败: %w", err)
@@ -174,12 +174,12 @@ func deleteTask(db *sqlx.DB) error {
 
 		// 删除备份记录
 		deleteBackupSql := "delete from backup_records where task_id = ? and version_id = ?"
-		if _, err := db.Exec(deleteBackupSql, *deleteID, *deleteVersionID); err != nil {
+		if _, err := db.Exec(deleteBackupSql, deleteID.Get(), deleteVersionID.Get()); err != nil {
 			return fmt.Errorf("删除备份记录失败: %w", err)
 		}
 
 		// 打印成功信息
-		CL.PrintOkf("任务ID: %d, 版本ID: %s 删除成功\n", *deleteID, *deleteVersionID)
+		CL.PrintOkf("任务ID: %d, 版本ID: %s 删除成功\n", deleteID.Get(), deleteVersionID.Get())
 
 		return nil
 	}
@@ -190,17 +190,17 @@ func deleteTask(db *sqlx.DB) error {
 // 多ID模式删除任务
 func deleteTasks(db *sqlx.DB, ids []int) error {
 	// 如果版本ID不为空, 同时任务ID列表也不为空, 则返回错误
-	if *deleteVersionID != "" && *deleteIDS != "" {
+	if deleteVersionID.Get() != "" && deleteIDS.Get() != "" {
 		return fmt.Errorf("-ids 不支持删除指定版本的备份, 请使用 -id 指定任务ID和版本ID")
 	}
 
 	// 检查是否没有指定任务ID列表
-	if *deleteIDS == "" {
+	if deleteIDS.Get() == "" {
 		return fmt.Errorf("必须指定要删除的任务, 请使用-ids指定任务ID列表, 例如: -ids '1,2,3'")
 	}
 
 	// 根据任务ID删除任务
-	if *deleteIDS != "" && *deleteVersionID == "" {
+	if deleteIDS.Get() != "" && deleteVersionID.Get() == "" {
 		var backupDir string // 备份目录
 		// 构建查询备份目录的SQL语句
 		backupDirSql := "SELECT backup_directory FROM backup_tasks WHERE task_id = ?"
@@ -246,7 +246,7 @@ func deleteTasks(db *sqlx.DB, ids []int) error {
 // - error: 错误信息
 func deleteBackupDir(backupDir string) error {
 	// 检查是否设置了删除目录标志(*deleteDirF)
-	if *deleteDirF {
+	if deleteDirF.Get() {
 		// 检查备份目录是否存在
 		if _, err := tools.CheckPath(backupDir); err == nil {
 			// 如果存在则删除整个目录
@@ -254,11 +254,11 @@ func deleteBackupDir(backupDir string) error {
 				return fmt.Errorf("删除备份存放目录失败: %w", err)
 			}
 			// 删除成功提示
-			CL.PrintOkf("备份存放目录删除成功: %s", backupDir)
+			CL.PrintOkf("备份存放目录删除成功: %s\n", backupDir)
 		}
 	} else {
 		// 没有设置删除标志时的提示
-		CL.PrintWarnf("注意: 备份目录 %s 未被删除，请在删除任务后手动清理，或下次使用 -d 参数自动删除", backupDir)
+		CL.PrintWarnf("注意: 备份目录 %s 未被删除，请在删除任务后手动清理，或下次使用 -d 参数自动删除\n", backupDir)
 	}
 	return nil
 }

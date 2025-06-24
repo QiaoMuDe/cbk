@@ -4,12 +4,12 @@ package cmd
 import (
 	"cbk/pkg/globals"
 	_ "embed"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"gitee.com/MM-Q/colorlib"
+	"gitee.com/MM-Q/qflag"
 	"gitee.com/MM-Q/verman"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -17,74 +17,6 @@ import (
 
 // 定义全局颜色渲染器
 var CL = colorlib.NewColorLib()
-
-// 初始化子命令的帮助信息
-func init() {
-	// 初始化list命令的帮助信息
-	listCmd.Usage = func() {
-		fmt.Println(HelpListText)
-	}
-
-	// 初始化run命令的帮助信息
-	runCmd.Usage = func() {
-		fmt.Println(HelpRunText)
-	}
-
-	// 初始化add命令的帮助信息
-	addCmd.Usage = func() {
-		fmt.Println(HelpAddText)
-	}
-
-	// 初始化delete命令的帮助信息
-	deleteCmd.Usage = func() {
-		fmt.Println(HelpDeleteText)
-	}
-
-	// 初始化edit命令的帮助信息
-	editCmd.Usage = func() {
-		fmt.Println(HelpEditText)
-	}
-
-	// 初始化log命令的帮助信息
-	logCmd.Usage = func() {
-		fmt.Println(HelpLogText)
-	}
-
-	// 初始化show命令的帮助信息
-	showCmd.Usage = func() {
-		fmt.Println(HelpShowText)
-	}
-
-	// 初始化unpack命令的帮助信息
-	unpackCmd.Usage = func() {
-		fmt.Println(HelpUnpackText)
-	}
-
-	// 初始化zip命令的帮助信息
-	zipCmd.Usage = func() {
-		fmt.Println(HelpZipText)
-	}
-
-	// 初始化unzip命令的帮助信息
-	unzipCmd.Usage = func() {
-		fmt.Println(HelpUnzipText)
-	}
-
-	// 初始化clear命令的帮助信息
-	clearCmd.Usage = func() {
-		fmt.Println(HelpClearText)
-	}
-
-	// 初始化init命令的帮助信息
-	initCmd.Usage = func() {
-		fmt.Println(HelpInitText)
-	}
-
-	// 初始化export命令的帮助信息
-	exportCmd.Usage = func() {
-		fmt.Println(HelpExportText)
-	}
-}
 
 // 程序运行入口
 func AppRun() error {
@@ -98,9 +30,7 @@ func AppRun() error {
 	defer func() {
 		// 检查数据库是否打开，如果打开则关闭
 		if db != nil {
-			if closeErr := db.Close(); closeErr != nil {
-				CL.PrintErrf("关闭数据库连接失败: %v\n", closeErr)
-			}
+			db.Close()
 		}
 	}()
 
@@ -109,49 +39,12 @@ func AppRun() error {
 		return fmt.Errorf("初始化数据目录失败: %w", initDataDirErr)
 	}
 
-	// 主标志
-	vFlag := flag.Bool("v", false, "显示版本信息")
-	vvFlag := flag.Bool("vv", false, "显示更详细的版本信息")
-	hFlag := flag.Bool("h", false, "显示帮助信息")
-	helpFlag := flag.Bool("help", false, "显示帮助信息")
-
-	// 解析主标志
-	flag.Parse()
-
-	// 打印版本信息
-	if *vFlag {
-		v := verman.Get()
-		if versionInfo, newErr := v.SprintVersion("simple"); newErr != nil {
-			return fmt.Errorf("获取版本信息失败: %w", newErr)
-		} else {
-			CL.Green(versionInfo)
-		}
-		return nil
-	}
-
-	// 打印更详细的版本信息
-	if *vvFlag {
-		v := verman.Get()
-		if versionInfo, newErr := v.SprintVersion("text"); newErr != nil {
-			return fmt.Errorf("获取版本信息失败: %w", newErr)
-		} else {
-			CL.Green(versionInfo)
-		}
-		return nil
-	}
-
-	// 打印帮助信息
-	if *hFlag || *helpFlag {
-		fmt.Println(HelpText)
-		return nil
-	}
-
 	// 获取命令行参数
-	args := flag.Args()
+	args := qflag.Args()
 
 	// 检查是否有子命令
 	if len(args) == 0 {
-		flag.PrintDefaults()
+		qflag.PrintHelp()
 		return nil
 	}
 
@@ -198,7 +91,7 @@ func initDB() (*sqlx.DB, error) {
 		}
 
 		// 执行初始化SQL语句
-		if _, execErr := db.Exec(initSql); execErr != nil {
+		if _, execErr := db.Exec(globals.InitSql); execErr != nil {
 			return nil, fmt.Errorf("执行初始化SQL语句失败: %w", execErr)
 		}
 
@@ -245,131 +138,43 @@ func initDataDir() error {
 // 定义子命令的执行逻辑
 func executeCommands(db *sqlx.DB, args []string) error {
 	switch args[0] {
-	case "list":
-		// 解析list命令的参数
-		if err := listCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析list命令参数失败: %v", err)
-		}
+	case listCmd.LongName(), listCmd.ShortName(): // list命令
 		// 执行list命令的逻辑
 		if err := listCmdMain(db); err != nil {
 			return fmt.Errorf("列出项目列表失败: %v", err)
 		}
 		return nil
-	case "l":
-		// 解析list命令的参数
-		if err := listCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析list命令参数失败: %v", err)
-		}
-		// 执行list命令的逻辑
-		if err := listCmdMain(db); err != nil {
-			return fmt.Errorf("列出项目列表失败: %v", err)
-		}
-		return nil
-	case "run":
-		// 解析run命令的参数
-		if err := runCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析run命令参数失败: %v", err)
-		}
+	case runCmd.LongName(), runCmd.ShortName(): // run命令
 		// 执行run命令的逻辑
 		if err := runCmdMain(db); err != nil {
 			return fmt.Errorf("执行备份任务失败: %v", err)
 		}
 		return nil
-	case "r":
-		// 解析run命令的参数
-		if err := runCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析run命令参数失败: %v", err)
-		}
-		// 执行run命令的逻辑
-		if err := runCmdMain(db); err != nil {
-			return fmt.Errorf("执行备份任务失败: %v", err)
-		}
-		return nil
-	case "add":
-		// 解析add命令的参数
-		if err := addCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析add命令参数失败: %v", err)
-		}
+	case addCmd.LongName(), addCmd.ShortName(): // add命令
 		// 执行add命令的逻辑
 		if err := addCmdMain(db); err != nil {
 			return fmt.Errorf("添加项目失败: %v", err)
 		}
 		return nil
-	case "a":
-		// 解析add命令的参数
-		if err := addCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析add命令参数失败: %v", err)
-		}
-		// 执行add命令的逻辑
-		if err := addCmdMain(db); err != nil {
-			return fmt.Errorf("添加项目失败: %v", err)
-		}
-		return nil
-	case "delete":
-		// 解析delete命令的参数
-		if err := deleteCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析delete命令参数失败: %v", err)
-		}
+	case deleteCmd.LongName(), deleteCmd.ShortName(): // delete命令
 		// 执行delete命令的逻辑
 		if err := deleteCmdMain(db); err != nil {
 			return fmt.Errorf("删除项目失败: %v", err)
 		}
 		return nil
-	case "d":
-		// 解析delete命令的参数
-		if err := deleteCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析delete命令参数失败: %v", err)
-		}
-		// 执行delete命令的逻辑
-		if err := deleteCmdMain(db); err != nil {
-			return fmt.Errorf("删除项目失败: %v", err)
-		}
-		return nil
-	case "edit":
-		// 解析edit命令的参数
-		if err := editCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析edit命令参数失败: %v", err)
-		}
+	case editCmd.LongName(), editCmd.ShortName(): // edit命令
 		// 执行edit命令的逻辑
 		if err := editCmdMain(db); err != nil {
 			return fmt.Errorf("编辑项目失败: %v", err)
 		}
 		return nil
-	case "e":
-		// 解析edit命令的参数
-		if err := editCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析edit命令参数失败: %v", err)
-		}
-		// 执行edit命令的逻辑
-		if err := editCmdMain(db); err != nil {
-			return fmt.Errorf("编辑项目失败: %v", err)
-		}
-		return nil
-	case "log":
-		// 解析log命令的参数
-		if err := logCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析log命令参数失败: %v", err)
-		}
+	case logCmd.LongName(), logCmd.ShortName(): // log命令
 		// 执行log命令的逻辑
-		if err := logCmdMain(db, 1, *logLimit); err != nil {
+		if err := logCmdMain(db, 1, logLimit.Get()); err != nil {
 			return fmt.Errorf("查看日志失败: %v", err)
 		}
 		return nil
-	case "show":
-		// 解析show命令的参数
-		if err := showCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析show命令参数失败: %v", err)
-		}
-		// 执行show命令的逻辑
-		if err := showCmdMain(db); err != nil {
-			return fmt.Errorf("查看指定备份任务的信息失败: %v", err)
-		}
-		return nil
-	case "s":
-		// 解析show命令的参数
-		if err := showCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析show命令参数失败: %v", err)
-		}
+	case showCmd.LongName(), showCmd.ShortName(): // show命令
 		// 执行show命令的逻辑
 		if err := showCmdMain(db); err != nil {
 			return fmt.Errorf("查看指定备份任务的信息失败: %v", err)

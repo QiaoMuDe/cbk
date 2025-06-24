@@ -21,9 +21,9 @@ func runCmdMain(db *sqlx.DB) error {
 	var ids []int
 
 	// 如果指定了多个任务ID, 则执行多任务模式
-	if *runIDS != "" {
+	if runIDS.Get() != "" {
 		// 解析多个任务ID
-		for _, idStr := range strings.Split(*runIDS, ",") {
+		for _, idStr := range strings.Split(runIDS.Get(), ",") {
 			// 检查解析的任务ID是否为空
 			if idStr == "" {
 				CL.PrintErr("任务ID不能为空")
@@ -56,9 +56,9 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 如果指定了单个任务ID, 则执行单任务模式
-	if *runID != 0 {
+	if runID.Get() != 0 {
 		// 添加单个任务ID到切片中
-		ids = append(ids, *runID)
+		ids = append(ids, runID.Get())
 
 		// 执行任务
 		if err := runTask(db, ids); err != nil {
@@ -69,7 +69,7 @@ func runCmdMain(db *sqlx.DB) error {
 	}
 
 	// 检查任务ID是否指定
-	if *runID == 0 || *runIDS == "" {
+	if runID.Get() == 0 || runIDS.Get() == "" {
 		return fmt.Errorf("运行备份任务时, 必须指定任务ID或任务ID列表, 使用 -id 或 -ids 指定, 例如: -id 1 或 -ids '1,2,3'")
 	}
 

@@ -54,24 +54,7 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 	}
 
 	// 选择完整格式
-	if *logView {
-		// 禁用表格的输出
-		if *logNoTable || *logNoTableShort {
-			// 打印备份记录
-			fmt.Printf("%-25s%-18s%-15s%-20s%-10s%-40s%-30s%-25s%-10s\n", "备份时间", "版本ID", "任务ID", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希")
-			for _, record := range records {
-				// 将时间戳转换为时间对象并格式化为易读格式
-				timestamp, err := time.Parse("20060102150405", record.Timestamp)
-				if err != nil {
-					return fmt.Errorf("解析时间戳失败: %w", err)
-				}
-				formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
-				fmt.Printf("%-25s%-25s%-15d%-20s%-10s%-40s%-30s%-30s%-10s\n", formattedTimestamp, record.VersionID, record.TaskID, record.TaskName, record.BackupStatus, record.BackupFileName, record.BackupSize, record.BackupPath, record.VersionHash)
-			}
-
-			return nil
-		}
-
+	if logView.Get() {
 		// 创建表格
 		t := table.NewWriter()
 
@@ -79,15 +62,15 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 		t.SetOutputMirror(os.Stdout)
 
 		// 设置表格样式
-		if style, ok := TableStyle[*logTableStyle]; ok {
+		if style, ok := globals.TableStyle[logTableStyle.Get()]; ok {
 			t.SetStyle(style)
 		} else {
 			// 定义样式列表
 			var styleList []string
-			for k := range TableStyle {
+			for k := range globals.TableStyle {
 				styleList = append(styleList, k)
 			}
-			return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *logTableStyle, styleList)
+			return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", logTableStyle.Get(), styleList)
 		}
 
 		// 添加表头
@@ -146,23 +129,6 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 		return nil
 	}
 
-	// 禁用表格的输出
-	if *logNoTable || *logNoTableShort {
-		// 打印备份记录
-		fmt.Printf("%-25s%-20s%-10s%-40s%-30s%-25s\n", "备份时间", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录")
-		for _, record := range records {
-			// 将时间戳转换为时间对象并格式化为易读格式
-			timestamp, err := time.Parse("20060102150405", record.Timestamp)
-			if err != nil {
-				return fmt.Errorf("解析时间戳失败: %w", err)
-			}
-			formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
-			fmt.Printf("%-25s%-20s%-10s%-40s%-30s%-30s\n", formattedTimestamp, record.TaskName, record.BackupStatus, record.BackupFileName, record.BackupSize, record.BackupPath)
-		}
-
-		return nil
-	}
-
 	// 默认为简略格式
 	// 创建表格
 	t := table.NewWriter()
@@ -171,15 +137,15 @@ func logCmdMain(db *sqlx.DB, page, pageSize int) error {
 	t.SetOutputMirror(os.Stdout)
 
 	// 设置表格样式
-	if style, ok := TableStyle[*logTableStyle]; ok {
+	if style, ok := globals.TableStyle[logTableStyle.Get()]; ok {
 		t.SetStyle(style)
 	} else {
 		// 定义样式列表
 		var styleList []string
-		for k := range TableStyle {
+		for k := range globals.TableStyle {
 			styleList = append(styleList, k)
 		}
-		return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *logTableStyle, styleList)
+		return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", logTableStyle.Get(), styleList)
 	}
 
 	// 添加表头

@@ -16,7 +16,7 @@ import (
 // showCmdMain 查询指定任务ID的备份记录并以表格形式输出
 func showCmdMain(db *sqlx.DB) error {
 	// 检查任务ID是否指定
-	if *showID == 0 {
+	if showID.Get() == 0 {
 		return fmt.Errorf("查询指定备份任务时, 必须指定任务ID")
 	}
 
@@ -27,31 +27,14 @@ func showCmdMain(db *sqlx.DB) error {
 	var records globals.BackupRecords
 
 	// 执行查询
-	if err := db.Select(&records, querySql, *showID); err == sql.ErrNoRows {
-		return fmt.Errorf("未找到指定任务ID %d 的备份记录", *showID)
+	if err := db.Select(&records, querySql, showID.Get()); err == sql.ErrNoRows {
+		return fmt.Errorf("未找到指定任务ID %d 的备份记录", showID.Get())
 	} else if err != nil {
 		return fmt.Errorf("查询备份记录失败: %w", err)
 	}
 
 	// 检查是否需要选择完整格式
-	if *showView {
-		// 禁用表格的输出
-		if *showNoTable || *showNoTableShort {
-			// 打印备份记录
-			fmt.Printf("%-25s%-18s%-15s%-20s%-10s%-40s%-30s%-25s%-10s\n", "备份时间", "版本ID", "任务ID", "任务名", "备份状态", "备份文件名", "备份文件大小", "备份存放目录", "版本哈希")
-			for _, record := range records {
-				// 将时间戳转换为时间对象并格式化为易读格式
-				timestamp, err := time.Parse("20060102150405", record.Timestamp)
-				if err != nil {
-					return fmt.Errorf("解析时间戳失败: %w", err)
-				}
-				formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
-				fmt.Printf("%-25s%-25s%-15d%-20s%-10s%-40s%-30s%-30s%-10s\n", formattedTimestamp, record.VersionID, record.TaskID, record.TaskName, record.BackupStatus, record.BackupFileName, record.BackupSize, record.BackupPath, record.VersionHash)
-			}
-
-			return nil
-		}
-
+	if showView.Get() {
 		// 创建表格
 		t := table.NewWriter()
 
@@ -59,15 +42,15 @@ func showCmdMain(db *sqlx.DB) error {
 		t.SetOutputMirror(os.Stdout)
 
 		// 设置表格样式
-		if style, ok := TableStyle[*showTableStyle]; ok {
+		if style, ok := globals.TableStyle[showTableStyle.Get()]; ok {
 			t.SetStyle(style)
 		} else {
 			// 定义样式列表
 			var styleList []string
-			for k := range TableStyle {
+			for k := range globals.TableStyle {
 				styleList = append(styleList, k)
 			}
-			return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *showTableStyle, styleList)
+			return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", showTableStyle.Get(), styleList)
 		}
 
 		// 添加表头
@@ -126,39 +109,21 @@ func showCmdMain(db *sqlx.DB) error {
 		return nil
 	}
 
-	// 禁用表格的输出
-	if *showNoTable || *showNoTableShort {
-		// 打印备份记录
-		fmt.Printf("%-25s%-18s%-15s%-20s\n", "备份时间", "版本ID", "任务ID", "任务名")
-		for _, record := range records {
-			// 将时间戳转换为时间对象并格式化为易读格式
-			timestamp, err := time.Parse("20060102150405", record.Timestamp)
-			if err != nil {
-				return fmt.Errorf("解析时间戳失败: %w", err)
-			}
-			formattedTimestamp := timestamp.Format("2006-01-02 15:04:05")
-			fmt.Printf("%-25s%-25s%-15d%-20s\n", formattedTimestamp, record.VersionID, record.TaskID, record.TaskName)
-		}
-
-		return nil
-
-	}
-
 	// 默认为简略格式
 	// 创建表格
 	t := table.NewWriter()
 	// 设置表格输出到标准输出
 	t.SetOutputMirror(os.Stdout)
 	// 设置表格样式
-	if style, ok := TableStyle[*showTableStyle]; ok {
+	if style, ok := globals.TableStyle[showTableStyle.Get()]; ok {
 		t.SetStyle(style)
 	} else {
 		// 定义样式列表
 		var styleList []string
-		for k := range TableStyle {
+		for k := range globals.TableStyle {
 			styleList = append(styleList, k)
 		}
-		return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *showTableStyle, styleList)
+		return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", showTableStyle.Get(), styleList)
 	}
 	// 添加表头
 	t.AppendHeader(table.Row{"备份时间", "版本ID", "任务ID", "任务名"})

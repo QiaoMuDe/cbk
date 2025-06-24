@@ -415,10 +415,10 @@ func RetainLatestFiles(db *sqlx.DB, files []string, retainCount, retainDays int)
 		info, err := os.Stat(filePath)
 		// 检查文件是否存在
 		if os.IsNotExist(err) {
-			CL.PrintErrf("备份文件不存在, 跳过: %s", filePath)
+			CL.PrintErrf("备份文件不存在, 跳过: %s\n", filePath)
 			continue
 		} else if err != nil {
-			CL.PrintErrf("获取文件信息时出错: %v", err)
+			CL.PrintErrf("获取文件信息时出错: %v\n", err)
 			continue
 		}
 
@@ -531,13 +531,13 @@ func deleteFiles(db *sqlx.DB, files []FileWithModTime) error {
 
 		// 检查 nameParts 的长度是否足够
 		if len(nameParts) < 2 {
-			CL.PrintErrf("文件名格式不正确，无法解析出足够的部分: %s, 请在稍后手动删除", file.Path)
+			CL.PrintErrf("文件名格式不正确，无法解析出足够的部分: %s, 请在稍后手动删除\n", file.Path)
 			continue
 		} else {
 			// 检查文件是否存在, 如果存在, 则删除
 			if _, err := CheckPath(file.Path); err == nil {
 				if err := os.Remove(file.Path); err != nil {
-					CL.PrintErrf("清理 %s 文件时出错: %v, 请在稍后手动删除", file.Path, err)
+					CL.PrintErrf("清理 %s 文件时出错: %v, 请在稍后手动删除\n", file.Path, err)
 				}
 			}
 		}
@@ -1172,7 +1172,7 @@ func RenameBackupDirectory(rootPath, oldDirName, newDirName string) error {
 		return fmt.Errorf("重命名备份目录失败: %w, Old: %s, New: %s", err, oldDirName, newDirName)
 	}
 
-	CL.PrintOkf("备份目录重命名成功: %s", filepath.Join(rootPath, newDirName))
+	CL.PrintOkf("备份目录重命名成功: %s\n", filepath.Join(rootPath, newDirName))
 	return nil
 }
 

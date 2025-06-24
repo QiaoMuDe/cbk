@@ -17,15 +17,10 @@ func listCmdMain(db *sqlx.DB) error {
 	t := table.NewWriter()
 
 	// 设置表格样式
-	if style, ok := TableStyle[*listTableStyle]; ok {
+	if style, ok := globals.TableStyle[listTableStyle.Get()]; ok {
 		t.SetStyle(style)
 	} else {
-		// 定义样式列表
-		var styleList []string
-		for k := range TableStyle {
-			styleList = append(styleList, k)
-		}
-		return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", *listTableStyle, styleList)
+		return fmt.Errorf("表格样式不存在: %s, 可选样式: %v", listTableStyle.Get(), globals.TableStyleList)
 	}
 
 	// 查询所有任务
@@ -37,24 +32,6 @@ func listCmdMain(db *sqlx.DB) error {
 	// 查询任务列表
 	if err := db.Select(&tasks, querySql); err != nil {
 		return fmt.Errorf("查询任务失败: %w", err)
-	}
-
-	// 禁用表格的输出
-	if *listNoTable || *listNoTableShort {
-		// 打印任务列表
-		fmt.Printf("%-30s %-10s %-15s %-15s %-30s %-30s %-20s %-30s\n",
-			"任务名", "任务ID", "保留数量", "保留天数", "目标目录", "备份目录", "是否禁用压缩", "排除规则")
-		for _, task := range tasks {
-			fmt.Printf("%-30s %-10d %-15d %-15d %-30s %-30s %-10s %-30s\n", task.TaskName, task.TaskID, task.RetentionCount, task.RetentionDays, task.TargetDirectory, task.BackupDirectory, func() string {
-				if task.NoCompression == 0 {
-					return "false"
-				} else {
-					return "true"
-				}
-			}(), task.ExcludeRules)
-		}
-
-		return nil
 	}
 
 	// 使用标准输出作为输出目标
@@ -85,6 +62,7 @@ func listCmdMain(db *sqlx.DB) error {
 			task.TargetDirectory,
 			task.BackupDirectory,
 			func() string {
+				// 根据NoCompression字段返回true或false
 				if task.NoCompression == 0 {
 					return "false"
 				} else {

@@ -152,7 +152,7 @@ func initShellScript(db *sqlx.DB) error {
 		}
 
 		// 打印提示信息
-		CL.PrintOkf("已生成到 %s 路径下", outPutPath)
+		CL.PrintOkf("已生成到 %s 路径下\n", outPutPath)
 	case "linux", "darwin":
 		// 检查输出路径是否为.sh文件
 		if filepath.Ext(outPutPath) != ".sh" {

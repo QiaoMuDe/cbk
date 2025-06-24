@@ -1,9 +1,15 @@
 package globals
 
 import (
+	_ "embed"
 	"os"
 	"path/filepath"
+
+	"github.com/jedib0t/go-pretty/v6/table"
 )
+
+//go:embed init.sql
+var InitSql string // 初始化SQL语句
 
 const (
 	CbkHomeDir       = ".cbk"       // 数据目录
@@ -82,3 +88,45 @@ var (
 		return false // 不排除任何文件或目录
 	}
 )
+
+// 定义存放表格样式的MAP
+var (
+	TableStyle = map[string]table.Style{
+		"df":   table.StyleDefault,       // 默认样式
+		"bd":   table.StyleBold,          // 加粗样式
+		"cb":   table.StyleColoredBright, // 亮色样式
+		"cd":   table.StyleColoredDark,   // 暗色样式
+		"de":   table.StyleDouble,        // 双边框样式
+		"lt":   table.StyleLight,         // 浅色样式
+		"ro":   table.StyleRounded,       // 圆角样式
+		"none": StyleNone,                // 禁用样式
+	}
+)
+
+// 定义禁用样式
+var StyleNone = table.Style{
+	Box: table.BoxStyle{
+		PaddingLeft:      " ", // 左边框
+		PaddingRight:     " ", // 右边框
+		MiddleHorizontal: " ", // 水平线
+		MiddleVertical:   " ", // 垂直线
+		TopLeft:          " ", // 左上角
+		TopRight:         " ", // 右上角
+		BottomLeft:       " ", // 左下角
+		BottomRight:      " ", // 右下角
+	},
+}
+
+// 定义存放表格样式的切片
+var TableStyleList = []string{"df", "bd", "cb", "cd", "de", "lt", "ro", "none"}
+
+// 表格样式的帮助信息
+var TableStyleHelp = `支持的表格样式：
+        "df":    默认样式
+	"bd":    加粗样式
+	"cb":    亮色样式
+	"cd":    暗色样式
+	"de":    双边框样
+	"lt":    浅色样式
+	"ro":    圆角样式
+	"none":  禁用样式`

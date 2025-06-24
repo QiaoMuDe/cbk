@@ -15,22 +15,22 @@ import (
 // add命令的执行逻辑
 func addCmdMain(db *sqlx.DB) error {
 	// 检查是否指定-f参数
-	if *addConfig != "" {
+	if addConfig.Get() != "" {
 		// 检查配置文件是否存在
-		if _, err := tools.CheckPath(*addConfig); err != nil {
+		if _, err := tools.CheckPath(addConfig.Get()); err != nil {
 			return fmt.Errorf("指定的配置文件不存在: %w", err)
 		}
 
 		// 读取配置文件
-		config, err := os.ReadFile(*addConfig)
+		config, err := os.ReadFile(addConfig.Get())
 		if err != nil {
-			return fmt.Errorf("读取 %s 配置文件失败: %w", *addConfig, err)
+			return fmt.Errorf("读取 %s 配置文件失败: %w", addConfig.Get(), err)
 		}
 
 		// 解析配置文件
 		var addTaskConfig globals.TaskConfig
 		if err := yaml.Unmarshal(config, &addTaskConfig); err != nil {
-			return fmt.Errorf("解析 %s 配置文件失败: %w", *addConfig, err)
+			return fmt.Errorf("解析 %s 配置文件失败: %w", addConfig.Get(), err)
 		}
 
 		// 添加任务
@@ -42,7 +42,7 @@ func addCmdMain(db *sqlx.DB) error {
 	}
 
 	// 如果没有指定-f参数, 则执行普通添加任务模式
-	if err := addTask(db, *addName, *addTarget, *addBackup, *addBackupDirName, *addRetentionCount, *addRetentionDays, *addNoCompression, *addExcludeRules); err != nil {
+	if err := addTask(db, addName.Get(), addTarget.Get(), addBackup.Get(), addBackupDirName.Get(), addRetentionCount.Get(), addRetentionDays.Get(), addNoCompression.Get(), addExcludeRules.Get()); err != nil {
 		return fmt.Errorf("添加任务失败: %w", err)
 	}
 	return nil
@@ -99,7 +99,7 @@ func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, b
 	}
 
 	// 如果指定了禁用压缩, 则检查是否合法
-	if *addNoCompression != 1 && *addNoCompression != 0 {
+	if addNoCompression.Get() != 1 && addNoCompression.Get() != 0 {
 		return fmt.Errorf("-nc 参数不合法, 只能是 0(启用压缩) 或 1(禁用压缩)")
 	}
 
@@ -170,6 +170,6 @@ func addTask(db *sqlx.DB, taskName string, targetDir string, backupDir string, b
 	}
 
 	// 打印成功信息
-	CL.PrintOkf("任务添加成功: %s", taskName)
+	CL.PrintOkf("任务添加成功: %s\n", taskName)
 	return nil
 }

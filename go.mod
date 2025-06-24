@@ -1,9 +1,10 @@
 module cbk
 
-go 1.24.2
+go 1.24.4
 
 require (
 	gitee.com/MM-Q/colorlib v1.2.3
+	gitee.com/MM-Q/qflag v0.0.31
 	gitee.com/MM-Q/verman v0.0.14
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/jmoiron/sqlx v1.4.0
