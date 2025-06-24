@@ -99,7 +99,7 @@ func AppRun() error {
 		// 检查数据库是否打开，如果打开则关闭
 		if db != nil {
 			if closeErr := db.Close(); closeErr != nil {
-				CL.PrintErrf("关闭数据库连接失败: %v", closeErr)
+				CL.PrintErrf("关闭数据库连接失败: %v\n", closeErr)
 			}
 		}
 	}()

@@ -12,14 +12,14 @@ func main() {
 	// 在返回时捕获处理
 	defer func() {
 		if err := recover(); err != nil {
-			tools.CL.PrintErrf("程序发生异常: %v", err)
+			tools.CL.PrintErr(err)
 			os.Exit(1)
 		}
 	}()
 
 	// 运行程序
 	if err := cmd.AppRun(); err != nil {
-		tools.CL.PrintErrf("程序发生错误: %v", err)
+		tools.CL.PrintErr(err)
 		os.Exit(1)
 	}
 

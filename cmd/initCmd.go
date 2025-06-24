@@ -190,7 +190,7 @@ func initShellScript(db *sqlx.DB) error {
 		}
 
 		// 打印提示信息
-		CL.PrintOkf("已生成到 %s 路径下", outPutPath)
+		CL.PrintOkf("已生成到 %s 路径下\n", outPutPath)
 	default:
 		return fmt.Errorf("不支持的操作系统: %s, 仅支持Windows, Linux, MacOS", osName)
 	}

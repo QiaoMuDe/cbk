@@ -32,14 +32,14 @@ func runCmdMain(db *sqlx.DB) error {
 
 			// 检查解析的任务ID是否包含特殊字符
 			if tools.ContainsSpecialChars(idStr) {
-				CL.PrintErrf("任务ID包含危险字符: %s", idStr)
+				CL.PrintErrf("任务ID包含危险字符: %s\n", idStr)
 				continue
 			}
 
 			// 将字符串转换为整数
 			id, err := strconv.Atoi(idStr)
 			if err != nil {
-				CL.PrintErrf("无效的任务ID: %s", idStr)
+				CL.PrintErrf("无效的任务ID: %s\n", idStr)
 				continue
 			}
 
@@ -99,40 +99,40 @@ func runTask(db *sqlx.DB, ids []int) error {
 	for _, id := range ids {
 		// 查询任务信息
 		if err := db.Get(&task, querySql, id); err == sql.ErrNoRows {
-			CL.PrintErrf("任务ID不存在 %d", id)
+			CL.PrintErrf("任务ID不存在 %d\n", id)
 			continue
 		} else if err != nil {
-			CL.PrintErrf("获取任务信息失败: %v", err)
+			CL.PrintErrf("获取任务信息失败: %v\n", err)
 			continue
 		}
 
 		// 检查目标目录或文件是否存在
 		if info, err := tools.CheckPath(task.TargetDirectory); err != nil {
-			CL.PrintErrf("目标目录或文件不存在: %v", err)
+			CL.PrintErrf("目标目录或文件不存在: %v\n", err)
 			continue
 		} else if info.IsDir {
 			// 检查目标目录内是否存在文件
 			entry, err := os.ReadDir(task.TargetDirectory)
 			if err != nil {
-				CL.PrintErrf("读取目标目录失败: %v", err)
+				CL.PrintErrf("读取目标目录失败: %v\n", err)
 				continue
 			}
 
 			// 检查目标目录内是否存在文件
 			if len(entry) == 0 {
-				CL.PrintErrf("目标目录为空, 跳过备份: %s", task.TargetDirectory)
+				CL.PrintErrf("目标目录为空, 跳过备份: %s\n", task.TargetDirectory)
 				continue
 			}
 		}
 
 		// 检查备份目录是否存在
 		if err := tools.EnsureDirExists(task.BackupDirectory); err != nil {
-			CL.PrintErrf("备份目录创建失败: %v", err)
+			CL.PrintErrf("备份目录创建失败: %v\n", err)
 			continue
 		}
 
 		// 打印提示信息
-		CL.PrintOkf("备份任务 [%s] 已启动，正在运行中……", task.TaskName)
+		CL.PrintOkf("备份任务 [%s] 已启动，正在运行中……\n", task.TaskName)
 
 		// 构建备份文件名
 		backupTime := time.Now().Format("20060102150405")
@@ -143,7 +143,7 @@ func runTask(db *sqlx.DB, ids []int) error {
 		if task.ExcludeRules != "none" {
 			var err error
 			if excludeFunc, err = tools.ParseExclude(task.ExcludeRules); err != nil {
-				CL.PrintErrf("解析任务ID %d 的排除规则失败: %v", id, err)
+				CL.PrintErrf("解析任务ID %d 的排除规则失败: %v\n", id, err)
 				continue
 			}
 		} else {
@@ -163,10 +163,10 @@ func runTask(db *sqlx.DB, ids []int) error {
 		if err != nil {
 			// 插入备份记录
 			if _, execErr := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); execErr != nil {
-				CL.PrintErrf("插入备份记录失败: %v", execErr)
+				CL.PrintErrf("插入备份记录失败: %v\n", execErr)
 				continue
 			}
-			CL.PrintErrf("备份 %s 任务失败: %v", task.TaskName, err)
+			CL.PrintErrf("备份 %s 任务失败: %v\n", task.TaskName, err)
 			continue
 		}
 
@@ -175,10 +175,10 @@ func runTask(db *sqlx.DB, ids []int) error {
 		if err != nil {
 			// 插入备份记录
 			if _, execErr := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); execErr != nil {
-				CL.PrintErrf("插入备份记录失败: %v", execErr)
+				CL.PrintErrf("插入备份记录失败: %v\n", execErr)
 				continue
 			}
-			CL.PrintErrf("获取备份文件MD5失败: %v", err)
+			CL.PrintErrf("获取备份文件MD5失败: %v\n", err)
 			continue
 		}
 
@@ -187,36 +187,36 @@ func runTask(db *sqlx.DB, ids []int) error {
 		if err != nil {
 			// 插入备份记录
 			if _, execErr := db.Exec(errorSql, versionID, id, backupTime, task.TaskName, "false", "-", "-", "-", "-"); execErr != nil {
-				CL.PrintErrf("插入备份记录失败: %v", execErr)
+				CL.PrintErrf("插入备份记录失败: %v\n", execErr)
 				continue
 			}
-			CL.PrintErrf("获取备份文件大小失败: %v", err)
+			CL.PrintErrf("获取备份文件大小失败: %v\n", err)
 			continue
 		}
 
 		// 插入备份记录
 		if _, execErr := db.Exec(insertSql, versionID, id, backupTime, task.TaskName, "true", filepath.Base(zipPath), backupFileSize, task.BackupDirectory, backupFileMD5); execErr != nil {
-			CL.PrintErrf("插入备份记录失败: %v", execErr)
+			CL.PrintErrf("插入备份记录失败: %v\n", execErr)
 			continue
 		}
 
 		// 获取备份目录下的以指定扩展名的文件列表
 		zipFiles, err := tools.GetZipFiles(task.BackupDirectory, ".zip")
 		if err != nil {
-			CL.PrintErrf("获取备份目录下的.zip文件失败: %v", err)
+			CL.PrintErrf("获取备份目录下的.zip文件失败: %v\n", err)
 			continue
 		}
 
 		// 删除多余的备份文件
 		if len(zipFiles) > task.RetentionCount {
 			if err := tools.RetainLatestFiles(db, zipFiles, task.RetentionCount, task.RetentionDays); err != nil {
-				CL.PrintErrf("删除多余的备份文件失败: %v", err)
+				CL.PrintErrf("删除多余的备份文件失败: %v\n", err)
 				continue
 			}
 		}
 
 		// 打印成功信息
-		CL.PrintOkf(`备份 %s 成功!`, task.TaskName)
+		CL.PrintOkf(`备份 %s 成功!\n`, task.TaskName)
 	}
 
 	return nil

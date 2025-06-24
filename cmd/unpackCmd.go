@@ -82,7 +82,7 @@ func unpackCmdMain(db *sqlx.DB) error {
 		return fmt.Errorf("解压备份文件失败: %w", err)
 	} else {
 		// 打印提示信息
-		CL.PrintOkf("解压任务完成, 输出路径: %s", unZipPath)
+		CL.PrintOkf("解压任务完成, 输出路径: %s\n", unZipPath)
 		return nil
 	}
 

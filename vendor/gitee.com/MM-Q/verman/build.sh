@@ -7,6 +7,8 @@ OUTPUT_FILE="输出文件名"
 PROJECT_NAME="项目名"
 # 入口文件
 ENTRY_FILE="main.go" # 入口文件位置
+# 是否使用vendor模式构建
+USE_VENDOR_IN_BUILD=false
 #########################################################################
 
 # 检查go编译器是否安装
@@ -89,7 +91,11 @@ echo "正在构建程序..."
 LD_FLAGS="-X 'gitee.com/MM-Q/verman.appName=${PROJECT_NAME}' -X 'gitee.com/MM-Q/verman.gitVersion=${GIT_VERSION}' -X 'gitee.com/MM-Q/verman.gitCommit=${GIT_COMMIT}' -X 'gitee.com/MM-Q/verman.gitCommitTime=${FORMAT_TIME}' -X 'gitee.com/MM-Q/verman.buildTime=${BUILD_TIME}' -X 'gitee.com/MM-Q/verman.gitTreeState=${GIT_STATUS}' -s -w"
 
 # 编译程序
-build_status=$(eval "go build -ldflags '"${LD_FLAGS}"' -o ${OUTPUT_FILE} ${ENTRY_FILE}" > /tmp/build.log 2>&1; echo $?)
+BUILD_CMD="go build -ldflags '"${LD_FLAGS}"'"
+if [ "$USE_VENDOR_IN_BUILD" = true ]; then
+    BUILD_CMD="${BUILD_CMD} -mod=vendor"
+fi
+build_status=$(eval "${BUILD_CMD} -o ${OUTPUT_FILE} ${ENTRY_FILE}" > /tmp/build.log 2>&1; echo $?)
 if [ $build_status -eq 1 ]; then
     echo "错误: 程序构建失败，请检查错误信息。"
     cat /tmp/build.log

@@ -1,16 +1,87 @@
 package colorlib
 
 import (
-	"fmt"
-	"strings"
+	"sync"
+	"sync/atomic"
 )
 
-type ColorLib struct {
-	// 空结构体，用于实现接口
-	LevelMap map[string]string // LevelMap 是一个映射，用于将日志级别映射到对应的前缀,// 日志级别映射到对应的前缀, 后面留空, 方便后面拼接提示内容
-	ColorMap map[string]string // colorMap 是一个映射，用于将颜色名称映射到对应的 ANSI 颜色代码。
-	LvlMap   map[string]string // LvlMap 是一个映射，用于将日志级别映射到对应的日志级别名称。
+var (
+	CL   *ColorLib // 全局实例可导入直接使用
+	once sync.Once // 确保全局实例只被初始化一次
+)
+
+// init 函数用于初始化全局 ColorLib 实例
+func init() {
+	once.Do(func() {
+		CL = NewColorLib()
+	})
 }
+
+// ColorLib 结构体用于管理颜色输出和日志级别映射。
+type ColorLib struct {
+	levelMap   sync.Map    // LevelMap 是一个映射，用于将日志级别映射到对应的前缀
+	colorMap   sync.Map    // colorMap 是一个映射，用于将颜色名称映射到对应的 ANSI 颜色代码。
+	bufferPool *sync.Pool  // 对象池
+	NoColor    atomic.Bool // NoColor 控制是否禁用颜色输出
+	NoBold     atomic.Bool // NoBold 控制是否禁用字体加粗
+	Underline  atomic.Bool // Underline 控制是否启用下划线
+	Blink      atomic.Bool // Blink 控制是否启用闪烁效果
+}
+
+const (
+	reset   = 0  // Reset 重置所有属性
+	Black   = 30 // Black 黑色
+	Red     = 31 // Red 红色
+	Green   = 32 // Green 绿色
+	Yellow  = 33 // Yellow 黄色
+	Blue    = 34 // Blue 蓝色
+	Purple  = 35 // Purple 紫色
+	Cyan    = 36 // Cyan 青色
+	White   = 37 // White 白色
+	Gray    = 90 // Gray 灰色
+	Lred    = 91 // Lred 亮红色
+	Lgreen  = 92 // Lgreen 亮绿色
+	Lyellow = 93 // Lyellow 亮黄色
+	Lblue   = 94 // Lblue 亮蓝色
+	Lpurple = 95 // Lpurple 亮紫色
+	Lcyan   = 96 // Lcyan 亮青色
+	Lwhite  = 97 // Lwhite 亮白色
+)
+
+// 定义日志级别和颜色的映射
+var (
+	colorMap = map[string]int{
+		"black":   Black,
+		"red":     Red,
+		"green":   Green,
+		"yellow":  Yellow,
+		"blue":    Blue,
+		"purple":  Purple,
+		"cyan":    Cyan,
+		"white":   White,
+		"gray":    Gray,
+		"lred":    Lred,
+		"lgreen":  Lgreen,
+		"lyellow": Lyellow,
+		"lblue":   Lblue,
+		"lpurple": Lpurple,
+		"lcyan":   Lcyan,
+		"lwhite":  Lwhite,
+	}
+
+	levelMap = map[string]string{
+		"success": "[Success] ", // 成功信息级别的前缀
+		"error":   "[Error] ",   // 错误信息级别的前缀
+		"warning": "[Warning] ", // 警告信息级别的前缀
+		"info":    "[Info] ",    // 信息信息级别的前缀
+		"debug":   "[Debug] ",   // 调试信息级别的前缀
+		"ok":      "ok: ",       // 简写形式
+		"err":     "err: ",      // 简写形式
+		"inf":     "info: ",     // 简写形式
+		"dbg":     "debug: ",    // 简写形式
+		"warn":    "warn: ",     // 简写形式
+	}
+)
 
 // ColorLibInterface 是一个接口，定义了一组方法，用于打印和返回带有颜色的文本。
 type ColorLibInterface interface {
@@ -107,91 +178,10 @@ type ColorLibInterface interface {
 	PrintInff(format string, a ...any)  // 打印信息到控制台（带占位符）
 	PrintDbgf(format string, a ...any)  // 打印调试信息到控制台（带占位符）
 	PrintWarnf(format string, a ...any) // 打印警告信息到控制台（带占位符）
-}
 
-// NewColorLib 函数用于创建一个新的 ColorLib 实例。
-func NewColorLib() *ColorLib {
-	// 创建一个新的 ColorLib 实例
-	cl := &ColorLib{
-		// LvlMap 是一个映射，用于将日志级别映射到对应的日志级别名称。
-		LvlMap: map[string]string{
-			"ok":   "ok: ",
-			"err":  "err: ",
-			"inf":  "info: ",
-			"dbg":  "debug: ",
-			"warn": "warn: ",
-		},
-		// LevelMap 是一个映射，用于将日志级别映射到对应的前缀。
-		LevelMap: map[string]string{
-			"success": "[Success] ", // 成功信息级别的前缀
-			"error":   "[Error] ",   // 错误信息级别的前缀
-			"warning": "[Warning] ", // 警告信息级别的前缀
-			"info":    "[Info] ",    // 信息信息级别的前缀
-			"debug":   "[Debug] ",   // 调试信息级别的前缀
-		},
-		// colorMap 是一个映射，用于将颜色名称映射到对应的 ANSI 颜色代码。
-		ColorMap: map[string]string{
-			"black":   "30", // 黑色文本的 ANSI 颜色代码
-			"red":     "31", // 红色文本的 ANSI 颜色代码
-			"green":   "32", // 绿色文本的 ANSI 颜色代码
-			"yellow":  "33", // 黄色文本的 ANSI 颜色代码
-			"blue":    "34", // 蓝色文本的 ANSI 颜色代码
-			"purple":  "35", // 紫色文本的 ANSI 颜色代码
-			"cyan":    "36", // 青色文本的 ANSI 颜色代码
-			"white":   "37", // 白色文本的 ANSI 颜色代码
-			"gray":    "90", // 灰色文本的 ANSI 颜色代码
-			"lred":    "91", // 亮红色文本的 ANSI 颜色代码
-			"lgreen":  "92", // 亮绿色文本的 ANSI 颜色代码
-			"lyellow": "93", // 亮黄色文本的 ANSI 颜色代码
-			"lblue":   "94", // 亮蓝色文本的 ANSI 颜色代码
-			"lpurple": "95", // 亮紫色文本的 ANSI 颜色代码
-			"lcyan":   "96", // 亮青色文本的 ANSI 颜色代码
-			"lwhite":  "97", // 亮白色文本的 ANSI 颜色代码
-		},
-	}
-
-	// 返回 ColorLib 实例
-	return cl
-}
-
-// printWithColor 方法用于将传入的参数以指定颜色文本形式打印到控制台。
-func (c *ColorLib) printWithColor(color string, msg ...any) {
-	// 获取颜色代码
-	code, ok := c.ColorMap[color]
-	if !ok {
-		fmt.Println("Invalid color:", color)
-		return
-	}
-
-	// 使用 strings.Builder 拼接字符串
-	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("\033[1;%sm", code)) // 添加颜色代码，并加粗
-
-	// 检查 msg 是否为空
-	if len(msg) > 0 {
-		builder.WriteString(fmt.Sprint(msg...)) // 拼接消息内容
-	} else {
-		builder.WriteString(" ") // 如果没有消息，添加一个空格，避免完全空白的输出
-	}
-
-	builder.WriteString("\033[0m") // 添加颜色重置代码
-	fmt.Println(builder.String())  // 使用 fmt.Println 自动处理换行
-}
-
-// returnWithColor 方法用于将传入的参数以指定颜色文本形式返回。
-func (c *ColorLib) returnWithColor(color string, msg ...any) string {
-	// 获取颜色代码
-	code, ok := c.ColorMap[color]
-	if !ok {
-		return fmt.Sprintf("Invalid color: %s", color)
-	}
-
-	// 检查 msg 是否为空
-	if len(msg) == 0 {
-		return fmt.Sprintf("\033[1;%sm\033[0m", code) // 返回空字符串，但带有颜色代码
-	}
-
-	// 使用 fmt.Sprint 将所有参数拼接成一个字符串
-	combinedMsg := fmt.Sprint(msg...)
-	return fmt.Sprintf("\033[1;%sm%s\033[0m", code, combinedMsg)
+	// 新增通用颜色方法
+	PrintColorf(code int, format string, a ...any)    // 打印通用颜色信息到控制台（带占位符）
+	PrintColor(code int, msg ...any)                  // 打印通用颜色信息到控制台, 无需占位符
+	Scolorf(code int, format string, a ...any) string // 返回构造后的通用颜色字符串（带占位符）
+	Scolor(code int, msg ...any) string               // 返回构造后的通用颜色字符串, 无需占位符
 }

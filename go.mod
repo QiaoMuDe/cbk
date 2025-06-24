@@ -3,8 +3,8 @@ module cbk
 go 1.24.2
 
 require (
-	gitee.com/MM-Q/colorlib v1.1.6
-	gitee.com/MM-Q/verman v0.0.1
+	gitee.com/MM-Q/colorlib v1.2.3
+	gitee.com/MM-Q/verman v0.0.14
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.28

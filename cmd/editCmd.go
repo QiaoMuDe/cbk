@@ -30,14 +30,14 @@ func editCmdMain(db *sqlx.DB) error {
 
 			// 检查解析的任务ID是否包含特殊字符
 			if tools.ContainsSpecialChars(idStr) {
-				CL.PrintErrf("任务ID包含危险字符: %s", idStr)
+				CL.PrintErrf("任务ID包含危险字符: %s\n", idStr)
 				continue
 			}
 
 			// 将字符串转换为整数
 			id, err := strconv.Atoi(idStr)
 			if err != nil {
-				CL.PrintErrf("无效的任务ID: %s", idStr)
+				CL.PrintErrf("无效的任务ID: %s\n", idStr)
 				continue
 			}
 
@@ -93,16 +93,16 @@ func editTask(db *sqlx.DB, ids []int) error {
 	for _, id := range ids {
 		// 检查所有的参数是否都没指定
 		if *editName == "" && *editRetentionCount == -1 && *editRetentionDays == -1 && *editNoCompression == -1 && *editNewDirName == "" && *editExcludeRules == "" {
-			CL.PrintWarnf("在编辑 %d 时未指定任何参数, 该任务将不会被修改", id)
+			CL.PrintWarnf("在编辑 %d 时未指定任何参数, 该任务将不会被修改\n", id)
 			continue
 		}
 
 		// 检查任务ID是否存在
 		if err := db.Get(&task, editSql, id); err == sql.ErrNoRows {
-			CL.PrintErrf("任务ID不存在 %d", id)
+			CL.PrintErrf("任务ID不存在 %d\n", id)
 			continue
 		} else if err != nil {
-			CL.PrintErrf("查询任务失败: %v, SQL: %s, ID: %d", err, editSql, id)
+			CL.PrintErrf("查询任务失败: %v, SQL: %s, ID: %d\n", err, editSql, id)
 			continue
 		}
 
@@ -125,7 +125,7 @@ func editTask(db *sqlx.DB, ids []int) error {
 		if *editNoCompression != -1 {
 			// 检查如果不是true或false则报错
 			if *editNoCompression != 1 && *editNoCompression != 0 {
-				CL.PrintErrf("-nc 参数不合法, 只能是 0(启用压缩) 或 1(禁用压缩)")
+				CL.PrintErrf("-nc 参数不合法, 只能是 0(启用压缩) 或 1(禁用压缩)\n")
 				continue
 			}
 
@@ -140,7 +140,7 @@ func editTask(db *sqlx.DB, ids []int) error {
 
 			// 检查备份目录名是否非法字符
 			if tools.ContainsSpecialChars(newDirName) {
-				CL.PrintErrf("备份目录名 [%s] 含非法字符, 请重试", newDirName)
+				CL.PrintErrf("备份目录名 [%s] 含非法字符, 请重试\n", newDirName)
 				continue
 			}
 
@@ -149,7 +149,7 @@ func editTask(db *sqlx.DB, ids []int) error {
 
 			// 重命名备份目录
 			if err := tools.RenameBackupDirectory(rootPath, oldDirName, newDirName); err != nil {
-				CL.PrintErrf("重命名备份目录失败: %v", err)
+				CL.PrintErrf("重命名备份目录失败: %v\n", err)
 				continue
 			}
 
@@ -168,38 +168,38 @@ func editTask(db *sqlx.DB, ids []int) error {
 			if *editNewDirName != "" {
 				// 为避免变量名冲突，将错误变量名改为 renameErr
 				if renameErr := tools.RenameBackupDirectory(rootPath, newDirName, oldDirName); renameErr != nil {
-					CL.PrintErrf("更新任务失败且恢复备份目录失败: %v", renameErr)
+					CL.PrintErrf("更新任务失败且恢复备份目录失败: %v\n", renameErr)
 					continue
 				}
-				CL.PrintOkf("更新任务失败, 已恢复备份目录: %s", filepath.Join(rootPath, oldDirName))
+				CL.PrintOkf("更新任务失败, 已恢复备份目录: %s\n", filepath.Join(rootPath, oldDirName))
 			}
-			CL.PrintErrf("更新任务失败: %v, SQL: %s, ID: %d", err, updateSql, id)
+			CL.PrintErrf("更新任务失败: %v, SQL: %s, ID: %d\n", err, updateSql, id)
 			continue
 		}
 
 		// 打印成功信息
 		CL.PrintOk("更新成功!")
 		if *editName != "" {
-			CL.PrintOkf("任务ID %d 的任务名已更新为: %s", id, task.TaskName)
+			CL.PrintOkf("任务ID %d 的任务名已更新为: %s\n", id, task.TaskName)
 		}
 		if *editRetentionCount != -1 {
-			CL.PrintOkf("任务ID %d 的保留数量已更新为: %d", id, task.RetentionCount)
+			CL.PrintOkf("任务ID %d 的保留数量已更新为: %d\n", id, task.RetentionCount)
 		}
 		if *editRetentionDays != -1 {
-			CL.PrintOkf("任务ID %d 的保留天数已更新为: %d", id, task.RetentionDays)
+			CL.PrintOkf("任务ID %d 的保留天数已更新为: %d\n", id, task.RetentionDays)
 		}
 		if *editNewDirName != "" {
-			CL.PrintOkf("任务ID %d 的备份目录已更新为: %s", id, task.BackupDirectory)
+			CL.PrintOkf("任务ID %d 的备份目录已更新为: %s\n", id, task.BackupDirectory)
 		}
 		if *editNoCompression != -1 {
 			if task.NoCompression == 1 {
-				CL.PrintOkf("任务ID %d 的压缩状态已更新为: 禁用", id)
+				CL.PrintOkf("任务ID %d 的压缩状态已更新为: 禁用\n", id)
 			} else {
-				CL.PrintOkf("任务ID %d 的压缩状态已更新为: 启用", id)
+				CL.PrintOkf("任务ID %d 的压缩状态已更新为: 启用\n", id)
 			}
 		}
 		if *editExcludeRules != "" {
-			CL.PrintOkf("任务ID %d 的排除规则已更新为: %s", id, task.ExcludeRules)
+			CL.PrintOkf("任务ID %d 的排除规则已更新为: %s\n", id, task.ExcludeRules)
 		}
 	}
 

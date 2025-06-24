@@ -8,6 +8,8 @@ set OUTPUT_FILE=输出文件名.exe
 set PROJECT_NAME=项目名
 :: 入口文件
 set ENTRY_FILE=main.go
+:: 是否使用vendor模式构建
+set USE_VENDOR_IN_BUILD=false
 
 
 echo 检测 Go 编译器是否安装...
@@ -81,7 +83,11 @@ echo 正在构建程序...
 set LD_FLAGS=-X "gitee.com/MM-Q/verman.appName=%PROJECT_NAME%" -X "gitee.com/MM-Q/verman.gitVersion=%GIT_VERSION%" -X "gitee.com/MM-Q/verman.gitCommit=%GIT_COMMIT%" -X "gitee.com/MM-Q/verman.gitCommitTime=%FORMAT_TIME%" -X "gitee.com/MM-Q/verman.buildTime=%BUILD_TIME%" -X "gitee.com/MM-Q/verman.gitTreeState=%GIT_STATUS%" -s -w
 
 :: 编译程序
-go build -ldflags "%LD_FLAGS%" -o %OUTPUT_FILE%  %ENTRY_FILE% > build.log 2>&1
+set BUILD_CMD=go build -ldflags "%LD_FLAGS%"
+if "%USE_VENDOR_IN_BUILD%"=="true" (
+    set BUILD_CMD=%BUILD_CMD% -mod=vendor
+)
+%BUILD_CMD% -o %OUTPUT_FILE% %ENTRY_FILE% > build.log 2>&1
 if %errorlevel% neq 0 (
     echo 错误: 程序构建失败，请检查错误信息。
     type build.log

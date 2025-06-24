@@ -37,11 +37,11 @@ func clearCmdMain(db *sqlx.DB) error {
 		// 遍历清理备份存放目录
 		for _, task := range tasks {
 			if err := os.RemoveAll(task.BackupDirectory); err != nil {
-				CL.PrintErrorf("清理备份存放目录失败: %s", task.BackupDirectory)
-				CL.PrintWarnf("请手动删除备份存放目录: %s", task.BackupDirectory)
+				CL.PrintErrorf("清理备份存放目录失败: %s\n", task.BackupDirectory)
+				CL.PrintWarnf("请手动删除备份存放目录: %s\n", task.BackupDirectory)
 				continue
 			}
-			CL.PrintOkf("清理备份存放目录成功: %s", task.BackupDirectory)
+			CL.PrintOkf("清理备份存放目录成功: %s\n", task.BackupDirectory)
 		}
 	}
 

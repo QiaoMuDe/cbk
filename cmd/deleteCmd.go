@@ -28,14 +28,14 @@ func deleteCmdMain(db *sqlx.DB) error {
 
 			// 检查解析的任务ID是否包含特殊字符
 			if tools.ContainsSpecialChars(idStr) {
-				CL.PrintErrf("任务ID包含危险字符: %s", idStr)
+				CL.PrintErrf("任务ID包含危险字符: %s\n", idStr)
 				continue
 			}
 
 			// 将字符串转换为整数
 			id, err := strconv.Atoi(idStr)
 			if err != nil {
-				CL.PrintErrf("无效的任务ID: %s", idStr)
+				CL.PrintErrf("无效的任务ID: %s\n", idStr)
 				continue
 			}
 
@@ -111,7 +111,7 @@ func deleteTask(db *sqlx.DB) error {
 			return fmt.Errorf("删除备份记录失败: %w", err)
 		}
 
-		CL.PrintOkf("任务删除成功: %s", *deleteName)
+		CL.PrintOkf("任务删除成功: %s\n", *deleteName)
 		return nil
 	}
 
@@ -140,7 +140,7 @@ func deleteTask(db *sqlx.DB) error {
 			return fmt.Errorf("删除备份记录失败: %w", err)
 		}
 
-		CL.PrintOkf("任务ID删除成功: %d", *deleteID)
+		CL.PrintOkf("任务ID删除成功: %d\n", *deleteID)
 		return nil
 	}
 
@@ -169,7 +169,7 @@ func deleteTask(db *sqlx.DB) error {
 				return fmt.Errorf("删除备份文件失败: %w", err)
 			}
 		} else {
-			CL.PrintWarnf("备份文件不存在: %s", backupRecord.BackupFile)
+			CL.PrintWarnf("备份文件不存在: %s\n", backupRecord.BackupFile)
 		}
 
 		// 删除备份记录
@@ -179,7 +179,7 @@ func deleteTask(db *sqlx.DB) error {
 		}
 
 		// 打印成功信息
-		CL.PrintOkf("任务ID: %d, 版本ID: %s 删除成功", *deleteID, *deleteVersionID)
+		CL.PrintOkf("任务ID: %d, 版本ID: %s 删除成功\n", *deleteID, *deleteVersionID)
 
 		return nil
 	}
@@ -207,32 +207,32 @@ func deleteTasks(db *sqlx.DB, ids []int) error {
 
 		for _, id := range ids {
 			if err := db.Get(&backupDir, backupDirSql, id); err == sql.ErrNoRows {
-				CL.PrintErrf("任务ID不存在: %d", id)
+				CL.PrintErrf("任务ID不存在: %d\n", id)
 				continue
 			} else if err != nil {
-				CL.PrintErrf("获取备份存放目录失败: %v", err)
+				CL.PrintErrf("获取备份存放目录失败: %v\n", err)
 				continue
 			}
 
 			// 删除备份目录
 			if err := deleteBackupDir(backupDir); err != nil {
-				CL.PrintErrf("删除备份存放目录失败: %v", err)
+				CL.PrintErrf("删除备份存放目录失败: %v\n", err)
 				continue
 			}
 
 			// 删除任务和备份记录
 			deleteSql := "DELETE FROM backup_tasks WHERE task_id = ?"
 			if _, err := db.Exec(deleteSql, id); err != nil {
-				CL.PrintErrf("删除任务失败: %v", err)
+				CL.PrintErrf("删除任务失败: %v\n", err)
 				continue
 			}
 			deleteBackupSql := "DELETE FROM backup_records WHERE task_id = ?"
 			if _, err := db.Exec(deleteBackupSql, id); err != nil {
-				CL.PrintErrf("删除备份记录失败: %v", err)
+				CL.PrintErrf("删除备份记录失败: %v\n", err)
 				continue
 			}
 
-			CL.PrintOkf("任务ID删除成功: %d", id)
+			CL.PrintOkf("任务ID删除成功: %d\n", id)
 		}
 	}
 

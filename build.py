@@ -84,7 +84,11 @@ def check_go_installed(go_compiler):
     try:
         print_success("正在检查 Go 编译器是否可用...")
         subprocess.run(
-            [go_compiler, "version"], capture_output=True, text=True, check=True
+            [go_compiler, "version"],
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding="utf-8",
         )
         return True
     except subprocess.CalledProcessError:
@@ -119,7 +123,11 @@ def run_go_mod_vendor(go_compiler):
     try:
         print_success("正在执行 go mod vendor 克隆依赖...")
         subprocess.run(
-            [go_compiler, "mod", "vendor"], capture_output=True, text=True, check=True
+            [go_compiler, "mod", "vendor"],
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding="utf-8",
         )
         print_success("go mod vendor 执行成功, 依赖已克隆到 vendor 目录。")
     except subprocess.CalledProcessError as e:
@@ -135,20 +143,23 @@ def run_go_mod_tidy(go_compiler, use_vendor):
         command.extend(["-v"])
     try:
         print_success("正在执行 go mod tidy...")
-        subprocess.run(command, capture_output=True, text=True, check=True)
+        subprocess.run(
+            command, capture_output=True, text=True, check=True, encoding="utf-8"
+        )
     except subprocess.CalledProcessError as e:
         print_error("go mod tidy 执行失败：")
         print_error(e.stderr.strip())
         sys.exit(1)
 
 
-def run_go_vet(go_compiler, use_vendor):
-    """执行 go vet 检查代码并处理输出"""
-    command = [go_compiler, "vet"]
-    command.append("./...")
+def run_code_check(go_compiler):
+    """执行代码检查, 使用go vet"""
+    command = [go_compiler, "vet", "./..."]
     try:
         print_success("正在执行 go vet 检查代码...")
-        subprocess.run(command, capture_output=True, text=True, check=True)
+        subprocess.run(
+            command, capture_output=True, text=True, check=True, encoding="utf-8"
+        )
     except subprocess.CalledProcessError as e:
         print_error("go vet 检查失败：")
         print_error(e.stderr.strip())
@@ -160,7 +171,11 @@ def run_gofmt(go_compiler):
     try:
         print_success("正在执行 gofmt 格式化代码...")
         subprocess.run(
-            [go_compiler, "fmt", "./..."], capture_output=True, text=True, check=True
+            [go_compiler, "fmt", "./..."],
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding="utf-8",
         )
     except subprocess.CalledProcessError as e:
         print_error("代码格式化失败：")
@@ -229,7 +244,14 @@ def build_go_app(
             env["GOARCH"] = machine
 
         # 使用指定的链接器标志和环境变量进行构建
-        subprocess.run(command, capture_output=True, text=True, check=True, env=env)
+        subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            env=env,
+            encoding="utf-8",
+        )
 
         if not is_batch:
             print_success(f"构建成功, 输出文件：{output_file}")
@@ -434,6 +456,7 @@ def get_git_info():
                 text=True,
                 check=True,
                 timeout=10,
+                encoding="utf-8",
             ).stdout.strip()
             git_commit = subprocess.run(
                 ["git", "rev-parse", "--short", "HEAD"],
@@ -441,6 +464,7 @@ def get_git_info():
                 text=True,
                 check=True,
                 timeout=10,
+                encoding="utf-8",
             ).stdout.strip()
             git_commit_time = subprocess.run(
                 ["git", "log", "-1", "--format=%cd", "--date=iso"],
@@ -448,6 +472,7 @@ def get_git_info():
                 text=True,
                 check=True,
                 timeout=10,
+                encoding="utf-8",
             ).stdout.strip()
             git_status = (
                 "dirty"
@@ -456,6 +481,7 @@ def get_git_info():
                     capture_output=True,
                     text=True,
                     timeout=10,
+                    encoding="utf-8",
                 ).stdout.strip()
                 else "clean"
             )
@@ -520,7 +546,7 @@ def pre_build_checks(go_compiler, entry_file, use_vendor):
             return False
     try:
         run_go_mod_tidy(go_compiler, use_vendor)
-        run_go_vet(go_compiler, use_vendor)
+        run_code_check(go_compiler)
         run_gofmt(go_compiler)
     except Exception as e:
         print_error(str(e))
@@ -629,8 +655,15 @@ def parse_arguments():
     parser.add_argument(
         "-i",
         "--install",
-        help="将可执行文件安装到GOPATH/bin目录",
+        help="安装指定路径的可执行文件到GOPATH/bin目录",
         default=None,
+    )
+    parser.add_argument(
+        "-ai",
+        "--auto-install",
+        action="store_true",
+        help="构建完成后自动安装可执行文件到GOPATH/bin目录",
+        default=False,
     )
     parser.add_argument(
         "-f",
@@ -664,7 +697,7 @@ def install_executable(executable_path, args=None):
 
     参数:
         executable_path: 要安装的可执行文件路径
-        args: 命令行参数对象，包含force等标志
+        args: 命令行参数对象, 包含force等标志
     """
     # 检查GOPATH环境变量
     gopath = os.getenv("GOPATH")
@@ -722,7 +755,7 @@ def main():
     # 解析命令行参数
     args = parse_arguments()
 
-    # 如果指定了安装参数
+    # 如果指定了单独安装参数
     if args.install:
         if not install_executable(args.install, args):
             sys.exit(1)
@@ -741,8 +774,12 @@ def main():
 
     # 如果是批量构建模式
     if args.batch:
-        batch_build(args)
-        return
+        try:
+            batch_build(args)
+        except Exception as e:
+            print_error(f"批量构建失败: {str(e)}")
+            sys.exit(1)
+        sys.exit(0)
 
     entry_file = args.entry  # 指定入口文件路径
     ldflags = args.ldflags  # 指定构建时的链接器标志
@@ -863,6 +900,12 @@ def main():
     # 计算构建耗时
     elapsed_time = end_time - start_time
     print_success(f"本次构建耗时: {elapsed_time:.2f} 秒")
+
+    # 单独构建模式下自动安装
+    if args.auto_install and not args.batch:
+        if not install_executable(output_file, args):
+            sys.exit(1)
+        sys.exit(0)
 
 
 if __name__ == "__main__":
