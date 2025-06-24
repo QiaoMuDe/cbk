@@ -8,7 +8,13 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
-//go:embed init.sql
+//go:embed autocomplete/bash/cbk.sh
+var BashCompletion string // 定义bash补全脚本
+
+//go:embed templates/add_task.yaml
+var AddTaskTemplate string // 定义添加任务的模板文件
+
+//go:embed sql/init.sql
 var InitSql string // 初始化SQL语句
 
 const (

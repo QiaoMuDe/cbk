@@ -42,9 +42,11 @@ const (
 
 // 内置标志名称
 var (
-	helpFlagName            = "help" // 帮助标志名称
-	helpFlagShortName       = "h"    // 帮助标志短名称
-	showInstallPathFlagName = "sip"  // 显示安装路径标志名称
+	helpFlagName            = "help"    // 帮助标志名称
+	helpFlagShortName       = "h"       // 帮助标志短名称
+	showInstallPathFlagName = "sip"     // 显示安装路径标志名称
+	versionFlagLongName     = "version" // 版本标志名称
+	versionFlagShortName    = "v"       // 版本标志短名称
 )
 
 // HelpTemplate 帮助信息模板结构体

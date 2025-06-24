@@ -14,7 +14,7 @@ import (
 // clearCmdMain 清除数据主逻辑
 func clearCmdMain(db *sqlx.DB) error {
 	// 检查是否确认
-	if !*clearConfirm {
+	if !clearConfirm.Get() {
 		return fmt.Errorf("请使用 -confirm 参数确认清除操作")
 	}
 

@@ -12,57 +12,7 @@ import (
 	_ "embed"
 )
 
-//go:embed help/help.txt
-var HelpText string
-
-//go:embed help/help_list.txt
-var HelpListText string // 定义子命令: list的帮助文本
-
-//go:embed help/help_run.txt
-var HelpRunText string // 定义子命令: run的帮助文本
-
-//go:embed help/help_add.txt
-var HelpAddText string // 定义子命令: add的帮助文本
-
-//go:embed help/help_delete.txt
-var HelpDeleteText string // 定义子命令: delete的帮助文本
-
-//go:embed help/help_edit.txt
-var HelpEditText string // 定义子命令: edit的帮助文本
-
-//go:embed help/help_log.txt
-var HelpLogText string // 定义子命令: log的帮助文本
-
-//go:embed help/help_show.txt
-var HelpShowText string // 定义子命令: show的帮助文本
-
-//go:embed help/help_zip.txt
-var HelpZipText string // 定义子命令: zip的帮助文本
-
-//go:embed help/help_unzip.txt
-var HelpUnzipText string // 定义子命令: unzip的帮助文本
-
-//go:embed help/help_unpack.txt
-var HelpUnpackText string // 定义子命令: unpack的帮助文本
-
-//go:embed help/help_clear.txt
-var HelpClearText string // 定义子命令: clear的帮助文本
-//go:embed help/help_init.txt
-var HelpInitText string // 定义子命令: init的帮助文本
-
-//go:embed autocomplete/bash/cbk.sh
-var BashCompletion string // 定义bash补全脚本
-
-//go:embed templates/add_task.yaml
-var AddTaskTemplate string // 定义添加任务的模板文件
-
-//go:embed help/help_export.txt
-var HelpExportText string // 定义子命令: export的帮助文本
-
 var (
-	// 根命令
-	versionF *qflag.BoolFlag
-
 	// list 子命令
 	listCmd        *qflag.Cmd
 	listTableStyle *qflag.EnumFlag
@@ -132,36 +82,28 @@ var (
 	unzipCmd       *qflag.Cmd
 	unzipFile      *qflag.StringFlag
 	unzipOutputDir *qflag.StringFlag
-)
-
-// 定义子命令及其参数
-var (
-	// 子命令: version
-	versionCmd = flag.NewFlagSet("version", flag.ExitOnError)
-
-	// 子命令: help
-	helpCmd = flag.NewFlagSet("help", flag.ExitOnError)
 
 	// 子命令: clear
-	clearCmd     = flag.NewFlagSet("clear", flag.ExitOnError)
-	clearConfirm = clearCmd.Bool("confirm", false, "确认是否执行清空数据操作")
+	clearCmd     *qflag.Cmd
+	clearConfirm *qflag.BoolFlag
 
 	// 子命令: init
-	initCmd  = flag.NewFlagSet("complete", flag.ExitOnError)
-	initType = initCmd.String("t", "", "指定要生成的配置类型, 可选值: bash, addtask")
-	initOut  = initCmd.String("o", "", "指定输出文件路径")
+	initCmd  *qflag.Cmd
+	initType *qflag.StringFlag
+	initOut  *qflag.StringFlag
 
 	// 子命令: export
-	exportCmd = flag.NewFlagSet("export", flag.ExitOnError)
-	exportID  = exportCmd.Int("id", 0, "指定要导出的任务ID")
-	exportAll = exportCmd.Bool("all", false, "导出所有任务")
+	exportCmd *qflag.Cmd
+	exportID  *qflag.IntFlag
+	exportAll *qflag.BoolFlag
 )
 
 func init() {
 	// 根命令
 	qflag.SetUseChinese(true) // 设置使用中文
 	qflag.SetDescription("命令行备份任务管理工具, 用于管理备份任务，包括添加、运行、编辑、删除备份任务，查看任务日志，显示任务详情等")
-	versionF = qflag.Bool("version", "v", false, "显示版本信息")
+	v := verman.Get() // 获取版本信息
+	qflag.SetVersion(fmt.Sprintf("%s %s", v.AppName, v.GitVersion))
 
 	// 子命令: list
 	listCmd = qflag.NewCmd("list", "ls", flag.ExitOnError)
@@ -255,12 +197,35 @@ func init() {
 	// 子命令: unzip
 	unzipCmd = qflag.NewCmd("unzip", "uz", flag.ExitOnError)
 	unzipCmd.SetUseChinese(true) // 设置使用中文
-	unpackCmd.SetDescription("解压指定的压缩文件到目标路径。如果未指定目标路径，则解压到当前目录")
+	unzipCmd.SetDescription("解压指定的压缩文件到目标路径。如果未指定目标路径，则解压到当前目录")
 	unzipFile = unzipCmd.String("file", "f", "", "指定要解压的压缩文件名")
 	unzipOutputDir = unzipCmd.String("dir", "d", ".", "指定解压的目标路径。如果未指定，则解压到当前目录")
 
+	// 子命令: clear
+	clearCmd = qflag.NewCmd("clear", "", flag.ExitOnError)
+	clearCmd.SetUseChinese(true) // 设置使用中文
+	clearCmd.SetDescription("清空所有备份任务及其备份文件")
+	clearConfirm = clearCmd.Bool("confirm", "cf", false, "确认是否执行清空数据操作")
+
+	// 子命令: init
+	initCmd = qflag.NewCmd("init", "", flag.ExitOnError)
+	initCmd.SetUseChinese(true) // 设置使用中文
+	initCmd.SetDescription("生成指定的配置模板")
+	initCmd.AddExample(qflag.ExampleInfo{Description: "为当前命令行工具生成 bash 类型的自动补全脚本", Usage: "cbk init -t bash"})
+	initCmd.AddExample(qflag.ExampleInfo{Description: "在当前目录下生成用于通过配置文件添加任务的add_task.yaml模板文件", Usage: "cbk init -t addtask -o add_task.yaml"})
+	initCmd.AddExample(qflag.ExampleInfo{Description: "为当前命令行工具安装 bash 类型的自动补全脚本。可以保存在~/.bashrc 文件中，以便在每次打开终端时自动加载", Usage: "source <(cbk init -t bash)"})
+	initType = initCmd.String("type", "t", "", "指定要生成的配置类型, 可选值: bash, addtask")
+	initOut = initCmd.String("out", "o", "", "指定输出文件路径")
+
+	// 子命令: export
+	exportCmd = qflag.NewCmd("export", "ex", flag.ExitOnError)
+	exportCmd.SetUseChinese(true) // 设置使用中文
+	exportCmd.SetDescription("导出指定的任务。可以选择通过任务ID或导出所有任务")
+	exportID = exportCmd.Int("id", "", 0, "指定要导出的任务ID")
+	exportAll = exportCmd.Bool("all", "", false, "导出所有任务")
+
 	// 添加子命令
-	if addErr := qflag.AddSubCmd(listCmd, runCmd, addCmd, deleteCmd, editCmd, logCmd, showCmd, unpackCmd, zipCmd, unzipCmd); addErr != nil {
+	if addErr := qflag.AddSubCmd(listCmd, runCmd, addCmd, deleteCmd, editCmd, logCmd, showCmd, unpackCmd, zipCmd, unzipCmd, clearCmd, initCmd, exportCmd); addErr != nil {
 		fmt.Printf("err: 添加子命令失败: %s\n", addErr)
 		os.Exit(1)
 	}
@@ -269,12 +234,5 @@ func init() {
 	if parseErr := qflag.Parse(); parseErr != nil {
 		fmt.Printf("err: %s\n", parseErr)
 		os.Exit(1)
-	}
-
-	// 检查版本标志
-	if versionF.Get() {
-		v := verman.Get()
-		fmt.Println(v.AppName, v.GitVersion)
-		os.Exit(0)
 	}
 }

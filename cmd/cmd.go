@@ -10,7 +10,6 @@ import (
 
 	"gitee.com/MM-Q/colorlib"
 	"gitee.com/MM-Q/qflag"
-	"gitee.com/MM-Q/verman"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -198,64 +197,19 @@ func executeCommands(db *sqlx.DB, args []string) error {
 			return fmt.Errorf("解压ZIP文件失败: %v", err)
 		}
 		return nil
-	// 打印版本信息
-	case "version":
-		// 解析version命令的参数
-		if err := versionCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析version命令参数失败: %v", err)
-		}
-		// 执行version命令的逻辑
-		v := verman.Get()
-		if versionInfo, err := v.SprintVersion("text"); err != nil {
-			return fmt.Errorf("获取版本信息失败: %v", err)
-		} else {
-			CL.Green(versionInfo)
-		}
-		return nil
-	// 打印帮助信息
-	case "help":
-		// 解析help命令的参数
-		if err := helpCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析help命令参数失败: %v", err)
-		}
-
-		// 如果没有指定子命令，则打印帮助信息
-		if len(helpCmd.Args()) == 0 {
-			return fmt.Errorf("请指定要查看帮助的命令, 例如: 'cbk help 指定命令'")
-		}
-
-		// 执行help命令的逻辑
-		if err := helpCmdMain(helpCmd.Args()[0]); err != nil {
-			return fmt.Errorf("打印帮助信息失败: %v", err)
-		}
-		return nil
-	case "clear":
-		// 解析clear命令的参数
-		if err := clearCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析clear命令参数失败: %v", err)
-		}
-
+	case clearCmd.LongName(): // clear命令
 		// 执行clear命令的逻辑
 		if err := clearCmdMain(db); err != nil {
 			return fmt.Errorf("清空数据库失败: %v", err)
 		}
 		return nil
-	case "init":
-		// 解析init命令的参数
-		if err := initCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析init命令参数失败: %v", err)
-		}
-
+	case initCmd.LongName(): // init命令
 		// 执行init命令的逻辑
-		if err := initCmdMain(*initType, db); err != nil {
+		if err := initCmdMain(initType.Get(), db); err != nil {
 			return fmt.Errorf("生成文件失败: %v", err)
 		}
 		return nil
-	case "export":
-		// 解析export命令的参数
-		if err := exportCmd.Parse(args[1:]); err != nil {
-			return fmt.Errorf("解析export命令参数失败: %v", err)
-		}
+	case exportCmd.LongName(), exportCmd.ShortName(): // export命令
 		// 执行export命令的逻辑
 		if err := exportCmdMain(db); err != nil {
 			return fmt.Errorf("导出数据库失败: %v", err)

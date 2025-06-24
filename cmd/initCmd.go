@@ -26,7 +26,7 @@ func initCmdMain(t string, db *sqlx.DB) error {
 		}
 
 		// 打印自动补全脚本
-		fmt.Println(BashCompletion)
+		fmt.Println(globals.BashCompletion)
 		return nil
 	case "b":
 		// 检查是否为Linux或Mac系统
@@ -35,7 +35,7 @@ func initCmdMain(t string, db *sqlx.DB) error {
 		}
 
 		// 打印自动补全脚本
-		fmt.Println(BashCompletion)
+		fmt.Println(globals.BashCompletion)
 		return nil
 	case "addtask":
 		// 检查当前目录是否存在add_task.yaml文件
@@ -44,7 +44,7 @@ func initCmdMain(t string, db *sqlx.DB) error {
 		}
 
 		// 写入 AddTaskTemplate 的内容到当前目录下的add_task.yaml文件中
-		if err := os.WriteFile("add_task.yaml", []byte(AddTaskTemplate), 0644); err != nil {
+		if err := os.WriteFile("add_task.yaml", []byte(globals.AddTaskTemplate), 0644); err != nil {
 			return fmt.Errorf("写入配置文件失败: %w", err)
 		}
 
@@ -58,7 +58,7 @@ func initCmdMain(t string, db *sqlx.DB) error {
 		}
 
 		// 写入 AddTaskTemplate 的内容到当前目录下的add_task.yaml文件中
-		if err := os.WriteFile("add_task.yaml", []byte(AddTaskTemplate), 0644); err != nil {
+		if err := os.WriteFile("add_task.yaml", []byte(globals.AddTaskTemplate), 0644); err != nil {
 			return fmt.Errorf("写入配置文件失败: %w", err)
 		}
 
@@ -85,17 +85,17 @@ func initCmdMain(t string, db *sqlx.DB) error {
 // 一键生成自动运行任务脚本
 func initShellScript(db *sqlx.DB) error {
 	// 检查输出路径不为空的时候检查是否存在
-	if *initOut != "" {
+	if initOut.Get() != "" {
 		// 检查是否已经存在同名文件
-		if _, err := tools.CheckPath(*initOut); err == nil {
-			return fmt.Errorf("指定的输出路径 %s 已存在同名文件, 请指定其他路径", *initOut)
+		if _, err := tools.CheckPath(initOut.Get()); err == nil {
+			return fmt.Errorf("指定的输出路径 %s 已存在同名文件, 请指定其他路径", initOut.Get())
 		}
 	}
 
 	// 获取输出路径
 	var outPutPath string
-	if *initOut != "" {
-		outPutPath = *initOut
+	if initOut.Get() != "" {
+		outPutPath = initOut.Get()
 	} else {
 		// 获取用户家目录
 		homeDir, err := os.UserHomeDir()

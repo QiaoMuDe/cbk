@@ -412,6 +412,18 @@ func Parse() error
 
 - `error`: 若解析过程中发生错误（如无效的标志、缺少必填参数等），则返回错误信息；否则返回 `nil`。
 
+### ParseFlagsOnly
+
+```go
+func ParseFlagsOnly() error
+```
+
+解析命令行参数并填充到相应的标志中，但不处理子命令的参数解析。该函数会调用全局默认命令实例 `QCommandLine` 的 `ParseFlagsOnly` 方法。
+
+**返回值:**
+
+- `error`: 若解析过程中发生错误（如无效的标志、缺少必填参数等），则返回错误信息；否则返回 `nil`。
+
 ### PrintHelp
 
 ```go
@@ -827,6 +839,12 @@ func (c *Cmd) Parse(args []string) (err error)
 Parse 解析命令行参数，自动检查长短标志，并处理内置标志 如果有子命令则会自动解析子命令的参数 参数：args：命令行参数切片 注意：该方法保证每个 Cmd 实例只会解析一次。
 
 ```go
+func (c *Cmd) ParseFlagsOnly(args []string) (err error)
+```
+
+ParseFlagsOnly 仅解析当前命令的标志参数（忽略子命令, 不会自动解析子命令） 参数：args：命令行参数切片 注意：该方法保证每个 Cmd 实例只会解析一次。
+
+```go
 func (c *Cmd) PrintHelp()
 ```
 
@@ -908,6 +926,7 @@ type CmdInterface interface {
     AddSubCmd(subCmd *Cmd) // 添加子命令，子命令会继承父命令的上下文
     SubCmds() []*Cmd // 获取所有已注册的子命令列表
     Parse(args []string) error // 解析命令行参数，自动处理标志和子命令
+    ParseFlagsOnly(args []string) (err error) // 仅解析标志参数，不处理子命令
     Args() []string // 获取所有非标志参数(未绑定到任何标志的参数)
     Arg(i int) string // 获取指定索引的非标志参数，索引越界返回空字符串
     NArg() int // 获取非标志参数的数量
@@ -918,6 +937,8 @@ type CmdInterface interface {
     GetNotes() []string // 获取所有备注信息
     AddExample(e ExampleInfo) // 添加示例信息
     GetExamples() []ExampleInfo // 获取所有示例信息
+    SetVersion(version string)  // 设置版本信息
+	GetVersion() string     // 获取版本信息
     String(longName, shortName, usage, defValue string) *StringFlag // 添加字符串类型标志
     Int(longName, shortName, usage string, defValue int) *IntFlag // 添加整数类型标志
     Bool(longName, shortName, usage string, defValue bool) *BoolFlag // 添加布尔类型标志
@@ -1312,6 +1333,7 @@ type QCommandLineInterface interface {
     AddSubCmd(subCmd *Cmd) // 添加子命令，子命令会继承父命令的上下文
     SubCmds() []*Cmd // 获取所有已注册的子命令列表
     Parse() error // 解析命令行参数，自动处理标志和子命令
+    ParseFlagsOnly() error // 解析命令行参数，仅处理标志，不处理子命令
     Args() []string // 获取所有非标志参数(未绑定到任何标志的参数)
     Arg(i int) string // 获取指定索引的非标志参数，索引越界返回空字符串
     NArg() int // 获取非标志参数的数量
@@ -1322,6 +1344,8 @@ type QCommandLineInterface interface {
     GetNotes() []string // 获取所有备注信息
     AddExample(e ExampleInfo) // 添加一个示例信息
     GetExamples() []ExampleInfo // 获取示例信息列表
+    SetVersion(version string) // 设置版本信息
+	GetVersion() string // 获取版本信息
     String(longName, shortName, defValue, usage string) *StringFlag // 添加字符串类型标志
     Int(longName, shortName string, defValue int, usage string) *IntFlag // 添加整数类型标志
     Bool(longName, shortName string, defValue bool, usage string) *BoolFlag // 添加布尔类型标志
@@ -1375,11 +1399,12 @@ Type 返回标志类型。
 
 ```go
 type TypedFlag[T any] interface {
-    Flag // 继承标志接口
-    GetDefault() T // 获取标志的具体类型默认值
-    Get() T // 获取标志的具体类型值
-    Set(T) error // 设置标志的具体类型值
-    SetValidator(Validator) // 设置标志的验证器
+    Flag                     // 继承标志接口
+    GetDefault() T           // 获取标志的具体类型默认值
+    Get() T                  // 获取标志的具体类型值
+    GetPointer() *T          // 获取标志的具体类型值指针
+    Set(T) error             // 设置标志的具体类型值
+    SetValidator(Validator)  // 设置标志的验证器
 }
 ```
 

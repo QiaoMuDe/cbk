@@ -32,7 +32,7 @@ func exportCmdMain(db *sqlx.DB) error {
 	printCmd := "cbk add -n %s -bn %s -t %s -b %s -c %d -d %d -nc %d -ex %s\n"
 
 	// 导出所有任务
-	if *exportAll {
+	if exportAll.Get() {
 		// 执行查询所有备份任务的SQL语句
 		if err := db.Select(&tasks, queryAllSql); err != nil {
 			return fmt.Errorf("查询所有备份任务失败: %w", err)
@@ -53,9 +53,9 @@ func exportCmdMain(db *sqlx.DB) error {
 	}
 
 	// 导出单个任务
-	if *exportID != 0 {
+	if exportID.Get() != 0 {
 		// 执行查询单个备份任务的SQL语句
-		if err := db.Get(&task, queryOneSql, *exportID); err != nil {
+		if err := db.Get(&task, queryOneSql, exportID.Get()); err != nil {
 			return fmt.Errorf("查询单个备份任务失败: %w", err)
 		}
 
