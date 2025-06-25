@@ -15,11 +15,12 @@ var QCommandLine *Cmd
 type QCommandLineInterface interface {
 	LongName() string                                                                                    // 获取命令长名称
 	ShortName() string                                                                                   // 获取命令短名称
-	Description() string                                                                                 // 获取命令描述信息
+	GetDescription() string                                                                              // 获取命令描述信息
 	SetDescription(desc string)                                                                          // 设置命令描述信息
-	Help() string                                                                                        // 获取命令帮助信息
+	GetHelp() string                                                                                     // 获取命令帮助信息
 	SetHelp(help string)                                                                                 // 设置命令帮助信息
-	SetUsage(usage string)                                                                               // 设置命令用法格式
+	SetUsageSyntax(usageSyntax string)                                                                   // 设置命令用法格式
+	GetUsageSyntax() string                                                                              // 获取命令用法格式
 	GetUseChinese() bool                                                                                 // 获取是否使用中文帮助信息
 	SetUseChinese(useChinese bool)                                                                       // 设置是否使用中文帮助信息
 	AddSubCmd(subCmd *Cmd)                                                                               // 添加子命令，子命令会继承父命令的上下文
@@ -60,13 +61,11 @@ type QCommandLineInterface interface {
 func init() {
 	// 处理可能的空os.Args情况
 	if len(os.Args) == 0 {
-		// 如果os.Args为空,则创建一个新的Cmd对象,命令行参数为"app",短名字为"a",错误处理方式为ExitOnError
-		QCommandLine = NewCmd("app", "a", flag.ExitOnError)
+		// 如果os.Args为空,则创建一个新的Cmd对象,命令行参数为"myapp",短名字为"a",错误处理方式为ExitOnError
+		QCommandLine = NewCmd("myapp", "", flag.ExitOnError)
 	} else {
-		// 如果os.Args不为空,则创建一个新的Cmd对象,命令行参数为filepath.Base(os.Args[0]),短名字为第一个字符,错误处理方式为ExitOnError
-		longName := filepath.Base(os.Args[0])
-		shortName := string(longName[0]) // 获取第一个字符作为短名称
-		QCommandLine = NewCmd(longName, shortName, flag.ExitOnError)
+		// 如果os.Args不为空,则创建一个新的Cmd对象,命令行参数为filepath.Base(os.Args[0]),错误处理方式为ExitOnError
+		QCommandLine = NewCmd(filepath.Base(os.Args[0]), "", flag.ExitOnError)
 	}
 }
 
@@ -94,8 +93,6 @@ func GetVersion() string {
 //
 // 返回值：
 //   - *StringFlag: 指向新创建的字符串标志对象的指针。
-//
-// 注意: 短标志可以为空
 func String(longName, shortName, defValue, usage string) *StringFlag {
 	return QCommandLine.String(longName, shortName, defValue, usage)
 }
@@ -110,8 +107,6 @@ func String(longName, shortName, defValue, usage string) *StringFlag {
 //
 // 返回值：
 //   - *IntFlag: 指向新创建的整数标志对象的指针。
-//
-// 注意: 短标志可以为空
 func Int(longName, shortName string, defValue int, usage string) *IntFlag {
 	return QCommandLine.Int(longName, shortName, defValue, usage)
 }
@@ -126,8 +121,6 @@ func Int(longName, shortName string, defValue int, usage string) *IntFlag {
 //
 // 返回值：
 //   - *BoolFlag: 指向新创建的布尔标志对象的指针。
-//
-// 注意: 短标志可以为空
 func Bool(longName, shortName string, defValue bool, usage string) *BoolFlag {
 	return QCommandLine.Bool(longName, shortName, defValue, usage)
 }
@@ -142,8 +135,6 @@ func Bool(longName, shortName string, defValue bool, usage string) *BoolFlag {
 //
 // 返回值：
 //   - *FloatFlag: 指向新创建的浮点数标志对象的指针。
-//
-// 注意: 短标志可以为空
 func Float(longName, shortName string, defValue float64, usage string) *FloatFlag {
 	return QCommandLine.Float(longName, shortName, defValue, usage)
 }
@@ -157,8 +148,6 @@ func Float(longName, shortName string, defValue float64, usage string) *FloatFla
 // - shortName: 命令行标志的短名称，在命令行中需以 `-shortName` 的格式使用。
 // - defValue: 该命令行标志的默认值，当用户在命令行中未指定该标志时，会使用此默认值。
 // - usage: 该命令行标志的帮助说明信息，会在显示帮助信息时展示给用户，用于解释该标志的用途。
-//
-// 注意: 短标志可以为空
 func StringVar(f *StringFlag, longName, shortName, defValue, usage string) {
 	QCommandLine.StringVar(f, longName, shortName, defValue, usage)
 }
@@ -174,8 +163,6 @@ func StringVar(f *StringFlag, longName, shortName, defValue, usage string) {
 //   - shortName: 命令行标志的短名称，在命令行中使用时需遵循 `-shortName` 的格式。
 //   - defValue: 该命令行标志的默认值。当用户在命令行中未指定该标志时，会采用此默认值。
 //   - usage: 该命令行标志的帮助说明信息，在显示帮助信息时会呈现给用户，用以解释该标志的具体用途。
-//
-// 注意: 短标志可以为空
 func IntVar(f *IntFlag, longName, shortName string, defValue int, usage string) {
 	QCommandLine.IntVar(f, longName, shortName, defValue, usage)
 }
@@ -189,8 +176,6 @@ func IntVar(f *IntFlag, longName, shortName string, defValue int, usage string) 
 // - shortName: 标志的短名称，在命令行中以 `-shortName` 的形式使用。
 // - defValue: 标志的默认值，当命令行未指定该标志时，会使用此默认值。
 // - usage: 标志的帮助说明信息，用于在显示帮助信息时展示给用户，解释该标志的用途。
-//
-// 注意: 短标志可以为空
 func BoolVar(f *BoolFlag, longName, shortName string, defValue bool, usage string) {
 	QCommandLine.BoolVar(f, longName, shortName, defValue, usage)
 }
@@ -204,8 +189,6 @@ func BoolVar(f *BoolFlag, longName, shortName string, defValue bool, usage strin
 // - shortName: 命令行标志的短名称，在命令行中需以 `-shortName` 的格式使用。
 // - defValue: 该命令行标志的默认值，当用户在命令行中未指定该标志时，会使用此默认值。
 // - usage: 该命令行标志的帮助说明信息，会在显示帮助信息时展示给用户，用于解释该标志的用途。
-//
-// 注意: 短标志可以为空
 func FloatVar(f *FloatFlag, longName, shortName string, defValue float64, usage string) {
 	QCommandLine.FloatVar(f, longName, shortName, defValue, usage)
 }
@@ -326,9 +309,9 @@ func ShortName() string {
 	return QCommandLine.ShortName()
 }
 
-// Description 获取命令描述信息
-func Description() string {
-	return QCommandLine.Description()
+// GetDescription 获取命令描述信息
+func GetDescription() string {
+	return QCommandLine.GetDescription()
 }
 
 // SetDescription 设置命令描述信息
@@ -357,8 +340,6 @@ func SubCmds() []*Cmd {
 //
 // 返回值：
 // - *EnumFlag: 指向新创建的枚举类型标志对象的指针。
-//
-// 注意: 短标志可以为空
 func Enum(longName, shortName string, defValue string, usage string, enumValues []string) *EnumFlag {
 	return QCommandLine.Enum(longName, shortName, defValue, usage, enumValues)
 }
@@ -373,8 +354,6 @@ func Enum(longName, shortName string, defValue string, usage string, enumValues 
 //   - defValue: 该命令行标志的默认值。当用户在命令行中未指定该标志时，会采用此默认值。该值会被复制一份，避免外部修改影响内部状态。
 //   - usage: 该命令行标志的帮助说明信息，在显示帮助信息时会呈现给用户，用以解释该标志的具体用途。
 //   - enumValues: 枚举值的集合，用于指定标志可接受的取值范围。
-//
-// 注意: 短标志可以为空
 func EnumVar(f *EnumFlag, longName, shortName string, defValue string, usage string, enumValues []string) {
 	QCommandLine.EnumVar(f, longName, shortName, defValue, usage, enumValues)
 }
@@ -389,8 +368,6 @@ func EnumVar(f *EnumFlag, longName, shortName string, defValue string, usage str
 //
 // 返回值：
 //   - *DurationFlag: 指向新创建的时间间隔类型标志对象的指针。
-//
-// 注意: 短标志可以为空
 func Duration(longName, shortName string, defValue time.Duration, usage string) *DurationFlag {
 	return QCommandLine.Duration(longName, shortName, defValue, usage)
 }
@@ -404,8 +381,6 @@ func Duration(longName, shortName string, defValue time.Duration, usage string) 
 //   - shortName: 命令行标志的短名称，在命令行中使用时需遵循 `-shortName` 的格式。
 //   - defValue: 该命令行标志的默认值。当用户在命令行中未指定该标志时，会采用此默认值。该值会被复制一份，避免外部修改影响内部状态。
 //   - usage: 该命令行标志的帮助说明信息，在显示帮助信息时会呈现给用户，用以解释该标志的具体用途。
-//
-// 注意: 短标志可以为空
 func DurationVar(f *DurationFlag, longName, shortName string, defValue time.Duration, usage string) {
 	QCommandLine.DurationVar(f, longName, shortName, defValue, usage)
 }
@@ -450,11 +425,11 @@ func GetExamples() []ExampleInfo {
 	return QCommandLine.GetExamples()
 }
 
-// Help 返回全局默认命令实例 `QCommandLine` 的帮助信息。
+// GetHelp 返回全局默认命令实例 `QCommandLine` 的帮助信息。
 // 返回值:
 //   - string: 命令行帮助信息。
-func Help() string {
-	return QCommandLine.Help()
+func GetHelp() string {
+	return QCommandLine.GetHelp()
 }
 
 // SetHelp 配置全局默认命令实例 `QCommandLine` 的帮助信息。
@@ -464,15 +439,22 @@ func SetHelp(help string) {
 	QCommandLine.SetHelp(help)
 }
 
-// SetUsage 配置全局默认命令实例 `QCommandLine` 的用法信息。
+// SetUsageSyntax 配置全局默认命令实例 `QCommandLine` 的用法信息。
 // 参数:
 //   - usage: 新的用法信息，字符串类型。
 //
 // 示例:
 //
-//	qflag.SetUsage("Usage: qflag [options]")
-func SetUsage(usage string) {
-	QCommandLine.SetUsage(usage)
+//	qflag.SetUsageSyntax("Usage: qflag [options]")
+func SetUsageSyntax(usageSyntax string) {
+	QCommandLine.SetUsageSyntax(usageSyntax)
+}
+
+// GetUsageSyntax 获取全局默认命令实例 `QCommandLine` 的用法信息。
+// 返回值:
+//   - string: 命令行用法信息。
+func GetUsageSyntax() string {
+	return QCommandLine.GetUsageSyntax()
 }
 
 // SetLogoText 配置全局默认命令实例 `QCommandLine` 的 logo 文本。

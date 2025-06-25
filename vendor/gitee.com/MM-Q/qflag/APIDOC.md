@@ -166,10 +166,10 @@ func BoolVar(f *BoolFlag, longName, shortName string, defValue bool, usage strin
 - `defValue`: 标志的默认值，当命令行未指定该标志时使用。
 - `usage`: 标志的帮助说明信息，用于在显示帮助信息时展示给用户。
 
-### Description
+### GetDescription
 
 ```go
-func Description() string
+func GetDescription() string
 ```
 
 获取全局默认命令实例 `QCommandLine` 的描述信息。
@@ -303,10 +303,10 @@ func GetUseChinese() bool
 
 - `bool`: 若启用中文显示，则返回 `true`；否则返回 `false`。
 
-### Help
+### GetHelp
 
 ```go
-func Help() string
+func GetHelp() string
 ```
 
 生成全局默认命令实例 `QCommandLine` 的帮助文档。
@@ -483,10 +483,10 @@ func SetModuleHelps(moduleHelps string)
 
 - `moduleHelps`: 模块帮助信息字符串，用于描述模块功能和使用方法。
 
-### SetUsage
+### SetUsageSyntax
 
 ```go
-func SetUsage(usage string)
+func SetUsageSyntax(usageSyntax string)
 ```
 
 设置全局默认命令实例 `QCommandLine` 的使用说明。
@@ -916,11 +916,11 @@ SubCmds 返回子命令列表。
 type CmdInterface interface {
     LongName() string // 获取命令名称(长名称)，如"app"
     ShortName() string // 获取命令短名称，如"a"
-    Description() string // 获取命令描述信息
+    GetDescription() string // 获取命令描述信息
     SetDescription(desc string) // 设置命令描述信息，用于帮助输出
-    Help() string // 获取自定义帮助信息
+    GetHelp() string // 获取自定义帮助信息
     SetHelp(help string) // 设置用户自定义命令帮助信息，覆盖自动生成内容
-    SetUsage(usage string) // 设置自定义命令用法，覆盖自动生成内容
+    SetUsageSyntax(usageSyntax string) // 设置自定义命令用法，覆盖自动生成内容
     GetUseChinese() bool // 获取是否使用中文帮助信息
     SetUseChinese(useChinese bool) // 设置是否使用中文帮助信息
     AddSubCmd(subCmd *Cmd) // 添加子命令，子命令会继承父命令的上下文
@@ -1323,11 +1323,11 @@ Type 返回标志类型。
 type QCommandLineInterface interface {
     LongName() string // 获取命令长名称
     ShortName() string // 获取命令短名称
-    Description() string // 获取命令描述信息
+    GetDescription() string // 获取命令描述信息
     SetDescription(desc string) // 设置命令描述信息
-    Help() string // 获取命令帮助信息
+    GetHelp() string // 获取命令帮助信息
     SetHelp(help string) // 设置命令帮助信息
-    SetUsage(usage string) // 设置命令用法格式
+    SetUsageSyntax(usage string) // 设置命令用法格式
     GetUseChinese() bool // 获取是否使用中文帮助信息
     SetUseChinese(useChinese bool) // 设置是否使用中文帮助信息
     AddSubCmd(subCmd *Cmd) // 添加子命令，子命令会继承父命令的上下文
