@@ -102,8 +102,9 @@ func init() {
 	// 根命令
 	qflag.SetUseChinese(true) // 设置使用中文
 	qflag.SetDescription("命令行备份任务管理工具, 用于管理备份任务，包括添加、运行、编辑、删除备份任务，查看任务日志，显示任务详情等")
-	v := verman.Get() // 获取版本信息
-	qflag.SetVersion(fmt.Sprintf("%s %s", v.AppName, v.GitVersion))
+	v := verman.Get()                                               // 获取版本信息
+	qflag.SetVersion(fmt.Sprintf("%s %s", v.AppName, v.GitVersion)) // 设置版本信息
+	qflag.SetEnableCompletion(true)                                 // 启用自动补全
 
 	// 子命令: list
 	listCmd = qflag.NewCmd("list", "ls", flag.ExitOnError)
