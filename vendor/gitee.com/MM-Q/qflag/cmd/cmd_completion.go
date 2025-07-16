@@ -3,18 +3,22 @@ package cmd
 
 import (
 	"bytes"
+	"container/list"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
-	"strings"
 
 	"gitee.com/MM-Q/qflag/flags"
 )
 
-// FlagParam 表示标志参数及其需求类型
+// FlagParam 表示标志参数及其需求类型和值类型
 type FlagParam struct {
-	Name string // 标志名称(保留原始大小写)
-	Type string // 参数需求类型: "required"|"optional"|"none"
+	CommandPath string   // 命令路径，如 "/cmd/subcmd"
+	Name        string   // 标志名称(保留原始大小写)
+	Type        string   // 参数需求类型: "required"|"optional"|"none"
+	ValueType   string   // 参数值类型: "path"|"string"|"number"|"enum"|"bool"等
+	EnumOptions []string // 枚举类型的可选值列表
 }
 
 // 生成标志的注意事项
@@ -54,415 +58,262 @@ var completionExamplesEN = []ExampleInfo{
 	{Description: "Windows system-wide installation (to ProgramFiles)", Usage: "%s --generate-shell-completion powershell > $env:ProgramFiles\\qflag\\completion.ps1"},
 }
 
-// 补全脚本模板常量
-const (
-	// Bash补全模板
-	//BashFunctionHeader   = "#!/usr/bin/env bash\n\n_%s() {\n\tlocal cur prev words cword context opts i arg\n\tCOMPREPLY=()\n\n\t# 使用_get_comp_words_by_ref获取补全参数, 提高健壮性\n\tif [[ -z \"${_get_comp_words_by_ref}\" ]]; then\n\t\t# 兼容旧版本Bash补全环境\n\t\twords=(\"${COMP_WORDS[@]}\")\n\t\tcword=$COMP_CWORD\n\telse\n\t\t_get_comp_words_by_ref -n =: cur prev words cword\n\tfi\n\n\tcur=\"${words[cword]}\"\n\tprev=\"${words[cword-1]}\"\n\n\t# 构建命令树结构\n\tdeclare -A cmd_tree\n\tcmd_tree[/]=\"%s\"\n%s\n\n\t# 查找当前命令上下文\n\tlocal context=\"/\"\n\tlocal i\n\tfor ((i=1; i < cword; i++)); do\n\t\tlocal arg=\"${words[i]}\"\n\t\tif [[ -n \"${cmd_tree[$context$arg/]}\" ]]; then\n\t\t\tcontext=\"$context$arg/\"\n\t\tfi\n\tdone\n\n\t# 获取当前上下文可用选项\n\topts=\"${cmd_tree[$context]}\"\n\tCOMPREPLY=($(compgen -W \"${opts}\" -- ${cur}))\n\treturn 0\n\t}\n\ncomplete -F _%s %s\n" // Bash补全函数头部
-	BashFunctionHeader = `#!/usr/bin/env bash
-
-_%s() {
-	local cur prev words cword context opts i arg
-	COMPREPLY=()
-
-	# 使用_get_comp_words_by_ref获取补全参数, 提高健壮性
-	if [[ -z "${_get_comp_words_by_ref}" ]]; then
-		# 兼容旧版本Bash补全环境
-		words=("${COMP_WORDS[@]}")
-		cword=$COMP_CWORD
-	else
-		_get_comp_words_by_ref -n =: cur prev words cword
-	fi
-
-	cur="${words[cword]}"
-	prev="${words[cword-1]}"
-
-	# 构建命令树结构
-	declare -A cmd_tree
-	cmd_tree[/]="%s"
-%s
-
-	# 查找当前命令上下文
-	local context="/"
-	local i
-	for ((i=1; i < cword; i++)); do
-		local arg="${words[i]}"
-		if [[ -n "${cmd_tree[$context$arg/]}" ]]; then
-			context="$context$arg/"
-		fi
-	done
-
-	# 获取当前上下文可用选项
-	opts="${cmd_tree[$context]}"
-	# 添加-o filenames选项处理特殊字符和空格
-	COMPREPLY=($(compgen -o filenames -W "${opts}" -- ${cur}))
-
-	# 模糊匹配与纠错提示：当无精确匹配时，从所有选项中查找包含关键词的项
-	if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
-		local all_opts=()
-		# 使用循环安全收集所有选项，避免空格分割问题
-		for path in "${!cmd_tree[@]}"; do
-			for opt in ${cmd_tree[$path]}; do
-				all_opts+=($opt)
-			done
-		done
-		# 去重并生成补全结果
-		local unique_opts=($(printf "%%s\n" "${all_opts[@]}" | sort -u))
-		COMPREPLY=($(compgen -o filenames -W "${unique_opts[*]}" -- ${cur}))
-	fi
-
-	return 0
-	}
-
-complete -F _%s %s
-`
-	BashCommandTreeEntry = "\tcmd_tree[/%s/]=\"%s\"\n" // 命令树条目格式
-
-	// PowerShell补全模板
-	//PwshFunctionHeader   = "Register-ArgumentCompleter -CommandName %s -ScriptBlock {\n    param($wordToComplete, $commandAst, $cursorPosition, $commandName, $parameterName)\n\n    # 标志参数需求映射\n    $flagParams = @{\n%s\n    }\n\n    # 构建命令树结构\n    $cmdTree = @{\n        '' = '%s'\n%s\n    }\n\n    # 解析命令行参数获取当前上下文\n    $context = ''\n    $args = $commandAst.CommandElements | Select-Object -Skip 1 | ForEach-Object { $_.ToString() }\n    $index = 0\n    $count = $args.Count\n\n    while ($index -lt $count) {\n        $arg = $args[$index]\n        # 处理选项参数及其值\n        if ($arg -like '-*' -and $flagParams.ContainsKey($arg)) {\n            $paramType = $flagParams[$arg]\n            $index++\n            \n            # 根据参数类型决定是否跳过下一个参数\n            if ($paramType -eq 'required' -or ($paramType -eq 'optional' -and $index -lt $count -and $args[$index] -notlike '-*')) {\n                $index++\n            }\n            continue\n        }\n\n        $nextContext = if ($context) { \"$context.$arg\" } else { $arg }\n        if ($cmdTree.ContainsKey($nextContext)) {\n            $context = $nextContext\n            $index++\n        } else {\n            break\n        }\n    }\n\n    # 获取当前上下文可用选项并过滤\n    $options = @()\n    if ($cmdTree.ContainsKey($context)) {\n        $options = $cmdTree[$context] -split ' ' | Where-Object { $_ -like \"$wordToComplete*\" }\n    }\n\n    $options | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterName', $_) }\n}\n" // PowerShell补全函数头部
-	PwshFunctionHeader = `Register-ArgumentCompleter -CommandName %s -ScriptBlock {
-		param($wordToComplete, $commandAst, $cursorPosition, $commandName, $parameterName)
-	
-		# 标志参数需求数组(保留原始大小写)
-		$flagParams = @(
-%s      )
-	
-		# 构建命令树结构
-		$cmdTree = @{
-%s      }
-	
-		# 解析命令行参数获取当前上下文
-		$context = ''
-		$args = $commandAst.CommandElements | Select-Object -Skip 1 | ForEach-Object { $_.ToString() }
-		$index = 0
-		$count = $args.Count
-	
-		while ($index -lt $count) {
-			$arg = $args[$index]
-			# 使用大小写敏感匹配查找标志
-			$paramInfo = $flagParams | Where-Object { $_.Name -ceq $arg } | Select-Object -First 1
-			if ($paramInfo) {
-				$paramType = $paramInfo.Type
-				$index++
-				
-				# 根据参数类型决定是否跳过下一个参数
-				if ($paramType -eq 'required' -or ($paramType -eq 'optional' -and $index -lt $count -and $args[$index] -notlike '-*')) {
-					$index++
-				}
-				continue
-			}
-	
-			$nextContext = if ($context) { "$context.$arg" } else { $arg }
-			if ($cmdTree.ContainsKey($nextContext)) {
-				$context = $nextContext
-				$index++
-			} else {
-				break
-			}
-		}
-	
-		# 获取当前上下文可用选项并过滤
-		$options = @()
-		if ($cmdTree.ContainsKey($context)) {
-			$options = $cmdTree[$context] -split ' ' | Where-Object { $_ -like "$wordToComplete*" }
-		}
-	
-		# 模糊匹配与纠错提示：当无精确匹配时，从所有选项中查找包含关键词的项
-		if (-not $options) {
-			# 递归收集所有层级的选项
-			$allOptions = @()
-			$cmdTree.Values | ForEach-Object { $allOptions += $_ -split ' ' }
-			$options = $allOptions | Select-Object -Unique | Where-Object { $_ -like "*$wordToComplete*" }
-		}
-	
-		$options | ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterName', $_) }
-	}`
-	PwshCommandTreeEntryRoot = "\t\t'' = '%s'\n"                    // 根命令树条目格式
-	PwshCommandTreeEntry     = "\t\t'%s' = '%s'\n"                  // 命令树条目格式
-	PwshCommandTreeOption    = "\t\t@{ Name = '%s'; Type = '%s'}\n" // 选项参数需求条目格式
-)
-
-// addSubCommandsBash 迭代方式添加子命令到命令树，替代递归实现
+// getValueTypeByFlagType 根据标志类型获取值类型
 //
 // 参数:
-//   - cmdTreeEntries - 用于存储命令树条目的缓冲区
-//   - parentPath - 父命令路径
-//   - cmds - 子命令列表
-func addSubCommandsBash(cmdTreeEntries *bytes.Buffer, parentPath string, cmds []*Cmd) {
-	// 使用队列实现广度优先遍历
-	type cmdNode struct {
-		cmd        *Cmd
-		parentPath string
-	}
-	queue := make([]cmdNode, 0, len(cmds))
-
-	// 初始化队列
-	for _, cmd := range cmds {
-		queue = append(queue, cmdNode{cmd: cmd, parentPath: parentPath})
-	}
-
-	// 定义处理命令名称的匿名函数 (直接传入cmd对象)
-	processCmdName := func(name string, currentParentPath string, cmd *Cmd, queue *[]cmdNode) {
-		if name == "" || cmd == nil {
-			return
-		}
-		// 使用strings.Builder优化路径拼接
-		var cmdPathBuilder strings.Builder
-		cmdPathBuilder.WriteString(currentParentPath)
-		cmdPathBuilder.WriteString(name)
-		cmdPathBuilder.WriteString("/")
-		cmdPath := cmdPathBuilder.String()
-		cmdPathBuilder.Reset()
-
-		// 去除末尾的斜杠 (通过切片操作避免额外字符串分配)
-		var trimmedPath string
-		if len(cmdPath) > 0 && cmdPath[len(cmdPath)-1] == '/' {
-			// 显式检查斜杠，避免极端情况下的切片越界
-			trimmedPath = cmdPath[:len(cmdPath)-1]
-		} else {
-			trimmedPath = cmdPath // 保留原始路径，避免切片越界
-		}
-
-		// 获取子命令补全选项 (通过cmd对象直接调用方法)
-		cmdOpts := cmd.collectCompletionOptions()
-
-		// 写入命令树条目
-		fmt.Fprintf(cmdTreeEntries, BashCommandTreeEntry, trimmedPath, strings.Join(cmdOpts, " "))
-
-		// 将子命令加入队列 (通过cmd对象访问子命令)
-		for _, subCmd := range cmd.subCmds {
-			*queue = append(*queue, cmdNode{cmd: subCmd, parentPath: cmdPath})
-		}
-	}
-
-	// 处理队列中的所有命令
-	for len(queue) > 0 {
-		// 出队
-		node := queue[0]                     // 获取当前命令节点
-		queue = queue[1:]                    // 移除已处理的元素
-		cmd := node.cmd                      // 获取当前命令
-		currentParentPath := node.parentPath // 获取当前命令的父路径
-
-		// 直接传递cmd对象给匿名函数
-		processCmdName(cmd.LongName(), currentParentPath, cmd, &queue)
-		processCmdName(cmd.ShortName(), currentParentPath, cmd, &queue)
-	}
-}
-
-// generateBashCompletion 生成Bash自动补全脚本
+//   - flagType - 标志类型
 //
-// 返回值：
-//   - string: Bash自动补全脚本
-func (c *Cmd) generateBashCompletion() (string, error) {
-	// 缓冲区
-	var buf bytes.Buffer
-
-	// 检查命令树注册表是否为空
-	if c == nil {
-		return "", fmt.Errorf("command instance is nil")
+// 返回值:
+//   - string: 值类型
+func getValueTypeByFlagType(flagType flags.FlagType) string {
+	switch flagType {
+	case flags.FlagTypeBool:
+		return "bool"
+	case flags.FlagTypeInt, flags.FlagTypeUint16, flags.FlagTypeUint32, flags.FlagTypeUint64, flags.FlagTypeInt64, flags.FlagTypeFloat64:
+		return "number"
+	case flags.FlagTypePath:
+		return "path"
+	case flags.FlagTypeEnum:
+		return "enum"
+	case flags.FlagTypeIP4, flags.FlagTypeIP6:
+		return "ip"
+	case flags.FlagTypeURL:
+		return "url"
+	default:
+		return "string"
 	}
-
-	// 如果不是父命令则返回错误
-	if c.parentCmd != nil {
-		return "", fmt.Errorf("invalid command state: not a root command")
-	}
-
-	// 检查标志注册表是否为空
-	if c.flagRegistry == nil {
-		return "", fmt.Errorf("invalid command state: flag registry is nil")
-	}
-
-	// 程序名称
-	programName := filepath.Base(os.Args[0])
-
-	// 获取根命令的补全选项
-	rootCmdOpts := c.collectCompletionOptions()
-
-	// 构建命令树条目缓冲区
-	var cmdTreeEntries bytes.Buffer
-
-	// 添加根命令选项
-	rootOpts := strings.Join(rootCmdOpts, " ")
-
-	// 从根命令的子命令开始添加条目
-	addSubCommandsBash(&cmdTreeEntries, "", c.subCmds)
-
-	// 写入补全函数头部和命令树
-	fmt.Fprintf(&buf, BashFunctionHeader, programName, rootOpts, cmdTreeEntries.String(), programName, programName)
-
-	return buf.String(), nil
 }
 
-// generatePwshCompletion 生成PowerShell自动补全脚本
-//
-// 返回值：
-//   - string: PowerShell自动补全脚本
-func (c *Cmd) generatePwshCompletion() (string, error) {
-	// 缓冲区
-	var buf bytes.Buffer
-
-	// 检查命令树注册表是否为空
-	if c == nil {
-		return "", fmt.Errorf("command instance is nil")
-	}
-
-	// 如果不是父命令则返回错误
-	if c.parentCmd != nil {
-		return "", fmt.Errorf("invalid command state: not a root command")
-	}
-
-	// 检查标志注册表是否为空
-	if c.flagRegistry == nil {
-		return "", fmt.Errorf("invalid command state: flag registry is nil")
-	}
-
-	// 程序名称
-	programName := filepath.Base(os.Args[0])
-
-	// 构建命令树条目缓冲区
-	var cmdTreeEntries bytes.Buffer
-
-	// 获取根命令的补全选项
-	rootCmdOpts := c.collectCompletionOptions()
-
-	// 添加根命令选项
-	rootOpts := strings.Join(rootCmdOpts, " ")
-
-	// 从根命令的子命令开始添加条目
-	addSubCommandsPwsh(&cmdTreeEntries, "", c.subCmds, rootOpts)
-
-	// 构建标志参数需求映射
-	var flagParamsBuf bytes.Buffer
-
-	// 收集当前命令的标志(从根命令开始)
-	flagParams := c.collectFlagParameters() // 现在返回[]FlagParam
-
-	// 写入标志参数需求条目 - 使用数组而非哈希表
-	for _, param := range flagParams {
-		fmt.Fprintf(&flagParamsBuf, PwshCommandTreeOption, param.Name, param.Type)
-	}
-
-	// 写入补全函数头部和命令树
-	fmt.Fprintf(&buf, PwshFunctionHeader, programName, flagParamsBuf.String(), cmdTreeEntries.String())
-
-	return buf.String(), nil
-}
-
-// addSubCommandsPwsh 迭代方式添加子命令到PowerShell命令树，替代递归实现
+// getParamTypeByFlagType 根据标志类型获取参数需求类型
 //
 // 参数:
-//   - cmdTreeEntries - 用于存储命令树条目的缓冲区
-//   - parentPath - 父命令路径(使用.作为分隔符)
-//   - cmds - 子命令列表
-func addSubCommandsPwsh(cmdTreeEntries *bytes.Buffer, parentPath string, cmds []*Cmd, rootOpts string) {
-	// 使用队列实现广度优先遍历
-	type cmdNode struct {
-		cmd        *Cmd
+//   - flagType - 标志类型
+//
+// 返回值:
+//   - string: 参数需求类型
+func getParamTypeByFlagType(flagType flags.FlagType) string {
+	if flagType == flags.FlagTypeBool {
+		return "none"
+	}
+	return "required"
+}
+
+// traverseCommandTree 遍历命令树
+//
+// 参数:
+//   - buf: 缓冲区
+//   - rootPath: 根路径
+//   - cmds: 命令列表
+//   - shellType: 目标 shell 类型
+func traverseCommandTree(buf *bytes.Buffer, rootPath string, cmds []*Cmd, shellType string) {
+	// node 代表一个即将写入的“树条目”
+	type node struct {
+		name       string // 真正写入的名字（长名或短名）
 		parentPath string
-	}
-	queue := make([]cmdNode, 0, len(cmds))
-
-	// 初始化队列
-	for _, cmd := range cmds {
-		queue = append(queue, cmdNode{cmd: cmd, parentPath: parentPath})
+		cmd        *Cmd // 为了拿到下一级 subCmds
 	}
 
-	// 写入根命令条目
-	fmt.Fprintf(cmdTreeEntries, PwshCommandTreeEntryRoot, rootOpts)
-
-	// 定义处理命令名称的匿名函数 (抽取重复逻辑)
-	processCmdName := func(name string, currentParentPath string, cmd *Cmd, cmdOpts []string) {
-		if name == "" {
-			return
-		}
-		// 构建命令路径(使用.作为分隔符)
-		cmdPath := currentParentPath
-		if cmdPath != "" {
-			cmdPath += fmt.Sprintf(".%s", name)
-		} else {
-			cmdPath = name
-		}
-
-		// 写入命令树条目
-		fmt.Fprintf(cmdTreeEntries, PwshCommandTreeEntry, cmdPath, strings.Join(cmdOpts, " "))
-
-		// 将子命令加入队列
-		for _, subCmd := range cmd.subCmds {
-			queue = append(queue, cmdNode{cmd: subCmd, parentPath: cmdPath})
-		}
+	if len(cmds) == 0 {
+		return
 	}
 
-	// 处理队列中的所有命令
-	for len(queue) > 0 {
-		// 出队
-		node := queue[0]                     // 获取当前命令节点
-		queue = queue[1:]                    // 移除已处理的元素
-		cmd := node.cmd                      // 获取当前命令
-		currentParentPath := node.parentPath // 获取当前命令的父命令路径
-
-		if cmd == nil {
+	// 初始化队列：把第一层命令按长短名拆开入队
+	q := list.New()
+	for _, c := range cmds {
+		if c == nil {
 			continue
 		}
 
-		// 获取子命令补全选项
-		cmdOpts := cmd.collectCompletionOptions()
+		// 长名入队
+		if n := c.LongName(); n != "" {
+			q.PushBack(node{name: n, parentPath: rootPath, cmd: c})
+		}
 
-		// 处理长命令和短命令 (通过匿名函数消除重复)
-		processCmdName(cmd.LongName(), currentParentPath, cmd, cmdOpts)  // 处理长命令
-		processCmdName(cmd.ShortName(), currentParentPath, cmd, cmdOpts) // 处理短命令
+		// 短名入队
+		if n := c.ShortName(); n != "" {
+			q.PushBack(node{name: n, parentPath: rootPath, cmd: c})
+		}
+	}
+
+	// 记录已经写了多少条，最后一条不补逗号
+	var written int
+
+	for q.Len() > 0 {
+		cur := q.Remove(q.Front()).(node)
+
+		// 计算当前节点完整路径
+		var fullPath string
+		if cur.parentPath == "/" {
+			// 根节点
+			fullPath = path.Join("/", cur.name) + "/"
+		} else {
+			// 子节点
+			fullPath = path.Join("/", cur.parentPath, cur.name) + "/"
+		}
+
+		// 根据 shell 写树条目
+		opts := cur.cmd.collectCompletionOptions()
+		switch shellType {
+		case flags.ShellBash: // Bash特定处理
+			generateBashCommandTreeEntry(buf, fullPath, opts)
+		case flags.ShellPwsh, flags.ShellPowershell: // Powershell特定处理
+			generatePwshCommandTreeEntry(buf, fullPath, opts)
+		}
+
+		// 子节点入队（同样按长短名拆分）
+		for _, sub := range cur.cmd.subCmds {
+			if sub == nil {
+				continue
+			}
+
+			// 长名入队
+			if n := sub.LongName(); n != "" {
+				q.PushBack(node{name: n, parentPath: fullPath, cmd: sub})
+			}
+
+			// 短名入队
+			if n := sub.ShortName(); n != "" {
+				q.PushBack(node{name: n, parentPath: fullPath, cmd: sub})
+			}
+		}
+
+		// 计数器累加
+		written++
+
+		// 只要不是最后一条就补逗号
+		if q.Len() > 0 {
+			// 如果是pwsh或者powershell，才处理
+			if shellType == flags.ShellPwsh || shellType == flags.ShellPowershell {
+				buf.WriteString(",\n")
+			}
+		}
 	}
 }
 
-// collectFlagParameters 收集所有命令标志参数需求，返回标志名称到参数需求类型的映射
-// 参数需求类型: "required"|"optional"|"none"
-func (c *Cmd) collectFlagParameters() []FlagParam {
-	params := make([]FlagParam, 0) // 使用切片存储标志参数需求
-	seen := make(map[string]bool)  // 使用原始标志名称作为键，区分大小写
+// generateShellCompletion 生成shell自动补全脚本
+//
+// 参数:
+//   - shellType: shell类型 ("bash", "pwsh", "powershell")
+//
+// 返回值：
+//   - string: 自动补全脚本
+//   - error: 错误信息
+func (c *Cmd) generateShellCompletion(shellType string) (string, error) {
+	// 缓冲区
+	var buf bytes.Buffer
 
-	// 定义匿名函数处理标志添加逻辑，包含参数类型判断
-	addFlagParam := func(flag *flags.FlagMeta, prefix, opt string) {
-		if opt == "" {
+	// 检查生成自动补全脚本的必要条件
+	if checkErr := validateCompletionGeneration(c); checkErr != nil {
+		return "", checkErr
+	}
+
+	// 程序名称
+	programName := filepath.Base(os.Args[0])
+
+	// 获取根命令的补全选项
+	rootCmdOpts := c.collectCompletionOptions()
+
+	// 构建命令树条目缓冲区
+	var cmdTreeEntries bytes.Buffer
+
+	// 从根命令的子命令开始添加条目
+	traverseCommandTree(&cmdTreeEntries, "", c.subCmds, shellType)
+
+	// 缓存标志参数，避免重复计算
+	params := c.collectFlagParameters()
+
+	// 根据shell类型调用对应的处理函数
+	switch shellType {
+	case flags.ShellBash: // Bash特定处理
+		generateBashCompletion(&buf, params, rootCmdOpts, cmdTreeEntries.String(), programName)
+	case flags.ShellPwsh, flags.ShellPowershell: // PowerShell特定处理
+		generatePwshCompletion(&buf, params, rootCmdOpts, cmdTreeEntries.String(), programName)
+	}
+
+	// 返回自动补全脚本
+	return buf.String(), nil
+}
+
+// collectFlagParameters 收集所有命令标志参数需求，返回标志名称到参数需求类型的映射
+//
+// 参数需求类型:
+//   - "required"
+//   - "optional"
+//   - "none"
+func (c *Cmd) collectFlagParameters() []FlagParam {
+	// 粗略估计：整棵树的 flag 总量
+	params := make([]FlagParam, 0, 256)
+	seen := make(map[string]struct{})
+
+	// 队列 BFS
+	type node struct {
+		cmd  *Cmd
+		path string // 已标准化好的路径
+	}
+	q := []node{{cmd: c, path: "/"}}
+
+	// add 添加一个标志到结果集
+	add := func(prefix, name string, cur node, meta *flags.FlagMeta) {
+		if name == "" {
 			return
 		}
 
-		// 拼接标志名称
-		flagName := prefix + opt
+		// 用“路径+flag”做唯一键
+		key := cur.path + prefix + name
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
 
-		// 只有在标志名称未被添加过时才添加
-		if !seen[flagName] {
-			seen[flagName] = true // 标记为已添加
+		// 添加标志参数
+		ft := meta.GetFlagType()
+		param := FlagParam{
+			CommandPath: cur.path,
+			Name:        prefix + name,
+			Type:        getParamTypeByFlagType(ft),
+			ValueType:   getValueTypeByFlagType(ft),
+		}
 
-			// 根据标志类型设置参数类型
-			paramType := "required"
-			if flag.GetFlagType() == flags.FlagTypeBool {
-				paramType = "none"
+		// 如果是枚举标志，则获取枚举选项
+		if ft == flags.FlagTypeEnum {
+			if ef, ok := meta.GetFlag().(*flags.EnumFlag); ok {
+				param.EnumOptions = ef.GetOptions()
+			}
+		}
+		params = append(params, param)
+	}
+
+	// 遍历命令节点
+	for len(q) > 0 {
+		cur := q[0] // 获取当前节点
+		q = q[1:]   // 移除当前节点
+
+		// 遍历当前命令的所有标志
+		for _, meta := range cur.cmd.flagRegistry.GetAllFlagMetas() {
+			// 如果短标志不为空，则添加短标志
+			if meta.GetShortName() != "" {
+				add("-", meta.GetShortName(), cur, meta)
 			}
 
-			// 添加标志参数需求
-			params = append(params, FlagParam{Name: flagName, Type: paramType})
-		}
-	}
-
-	// 使用队列实现广度优先遍历
-	queue := make([]*Cmd, 0, 10)
-	queue = append(queue, c)
-
-	// 遍历队列中的所有命令
-	for len(queue) > 0 {
-		cmd := queue[0]
-		queue = queue[1:]
-
-		// 收集当前命令的标志 - 同时处理长短选项
-		for _, flag := range cmd.flagRegistry.GetAllFlagMetas() {
-			// 处理短选项
-			addFlagParam(flag, "-", flag.GetShortName())
-			// 处理长选项
-			addFlagParam(flag, "--", flag.GetLongName())
+			// 如果长标志不为空，则添加长标志
+			if meta.GetLongName() != "" {
+				add("--", meta.GetLongName(), cur, meta)
+			}
 		}
 
-		// 将子命令加入队列
-		queue = append(queue, cmd.subCmds...)
-	}
+		// 子命令入队
+		for _, sub := range cur.cmd.subCmds {
+			if sub == nil {
+				continue
+			}
 
+			// 子命令路径
+			subPath := path.Join(cur.path, sub.Name()) + "/"
+
+			// 入队
+			q = append(q, node{cmd: sub, path: subPath})
+		}
+	}
 	return params
 }
 
@@ -474,36 +325,65 @@ func (c *Cmd) collectFlagParameters() []FlagParam {
 // 返回值：
 //   - 包含所有标志选项和子命令名称的字符串切片
 func (c *Cmd) collectCompletionOptions() []string {
-	// 防御性检查
 	if c == nil || c.flagRegistry == nil {
-		return []string{}
+		return nil
 	}
 
-	// 获取所有标志
-	flags := c.flagRegistry.GetAllFlagMetas()
+	// 获取所有标志数量(长标志+短标志)
+	flagCnt := len(c.flagRegistry.GetAllFlags())
 
-	// 获取所有子命令
-	subCmdMap := c.subCmdMap
+	// 计算总容量（标志数量+子命令数量*2）
+	capacity := flagCnt + len(c.subCmds)*2
 
-	// 预分配切片容量，减少动态扩容的开销
-	capacity := len(flags)*2 + len(subCmdMap) // 每个标志和子命令(子命令map已包含长短名)最多2个选项
-	opts := make([]string, 0, capacity)
+	// 创建一个用于存储标志选项和子命令名称的切片
+	seen := make(map[string]struct{}, capacity)
 
-	// 获取所有长选项和短选项(为空时不会循环)
-	for _, m := range flags {
-		if m.GetLongName() != "" {
-			opts = append(opts, fmt.Sprint("--", m.GetLongName()))
-		}
-		if m.GetShortName() != "" {
-			opts = append(opts, fmt.Sprint("-", m.GetShortName()))
+	// 定义一个添加选项的函数
+	add := func(s string) {
+		if s != "" {
+			seen[s] = struct{}{}
 		}
 	}
 
-	// 获取所有子命令(为空时不会循环)
-	for subCmd := range subCmdMap {
-		opts = append(opts, subCmd)
+	// 1. flags （同时展开长短名）
+	for _, m := range c.flagRegistry.GetAllFlagMetas() {
+		add("--" + m.GetLongName())
+		add("-" + m.GetShortName())
 	}
 
-	// 返回所有选项
+	// 2. sub-commands（同时展开长短名）
+	for _, sub := range c.subCmds {
+		if sub == nil {
+			continue
+		}
+		add(sub.LongName())
+		add(sub.ShortName())
+	}
+
+	// 3. 转回切片
+	opts := make([]string, 0, len(seen))
+	for k := range seen {
+		opts = append(opts, k)
+	}
 	return opts
+}
+
+// validateCompletionGeneration 验证补全脚本生成所需的命令状态
+//
+// 参数:
+//   - c: 命令实例
+//
+// 返回值:
+//   - error: 如果验证失败, 返回相应的错误信息; 否则返回nil
+func validateCompletionGeneration(c *Cmd) error {
+	if c == nil {
+		return fmt.Errorf("command instance is nil")
+	}
+	if c.parentCmd != nil {
+		return fmt.Errorf("invalid command state: not a root command")
+	}
+	if c.flagRegistry == nil {
+		return fmt.Errorf("invalid command state: flag registry is nil")
+	}
+	return nil
 }

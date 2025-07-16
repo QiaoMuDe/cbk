@@ -29,7 +29,7 @@ func AppRun() error {
 	defer func() {
 		// 检查数据库是否打开，如果打开则关闭
 		if db != nil {
-			db.Close()
+			_ = db.Close()
 		}
 	}()
 

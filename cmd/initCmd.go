@@ -137,7 +137,7 @@ func initShellScript(db *sqlx.DB) error {
 		if err != nil {
 			return fmt.Errorf("打开文件失败: %w", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		// 写入脚本内容
 		if _, err := file.WriteString("@echo off\n"); err != nil {
@@ -146,7 +146,7 @@ func initShellScript(db *sqlx.DB) error {
 
 		// 循环写入任务ID对应的脚本内容
 		for _, task := range taskIDs {
-			if _, err := file.WriteString(fmt.Sprintf("start cbk run -id %d\n", task.TaskID)); err != nil {
+			if _, err := fmt.Fprintf(file, "start cbk run -id %d\n", task.TaskID); err != nil {
 				return fmt.Errorf("写入脚本内容失败: %w", err)
 			}
 		}
@@ -164,7 +164,7 @@ func initShellScript(db *sqlx.DB) error {
 		if err != nil {
 			return fmt.Errorf("打开文件失败: %w", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		// 写入脚本内容
 		if _, err := file.WriteString("#!/bin/bash\n"); err != nil {
@@ -173,7 +173,7 @@ func initShellScript(db *sqlx.DB) error {
 
 		// 循环写入任务ID对应的脚本内容
 		for _, task := range taskIDs {
-			if _, err := file.WriteString(fmt.Sprintf("( cbk run -id %d ) &\n pid%d=$!\n", task.TaskID, task.TaskID)); err != nil {
+			if _, err := fmt.Fprintf(file, "( cbk run -id %d ) &\n pid%d=$!\n", task.TaskID, task.TaskID); err != nil {
 				return fmt.Errorf("写入脚本内容失败: %w", err)
 			}
 		}

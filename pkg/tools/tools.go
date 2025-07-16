@@ -190,14 +190,14 @@ func moveFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer srcFile.Close()
+	defer func() { _ = srcFile.Close() }()
 
 	// 创建目标文件
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer dstFile.Close()
+	defer func() { _ = dstFile.Close() }()
 
 	// 拷贝内容
 	if _, copyErr := io.Copy(dstFile, srcFile); copyErr != nil {
@@ -234,7 +234,7 @@ func GetFileMD5Last8(filePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("打开文件时出错: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// 获取文件大小
 	fileInfo, err := file.Stat()
@@ -678,11 +678,11 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, excludeF
 	if err != nil {
 		return fmt.Errorf("创建 ZIP 文件失败: %w", err)
 	}
-	defer zipFile.Close()
+	defer func() { _ = zipFile.Close() }()
 
 	// 创建 ZIP 写入器
 	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close() // 确保在函数结束时关闭 ZIP 写入器
+	defer func() { _ = zipWriter.Close() }() // 确保在函数结束时关闭 ZIP 写入器
 
 	// 获取源目录的总大小，用于进度条
 	totalSize := int64(0)
@@ -815,7 +815,7 @@ func CreateZip(zipFilePath string, sourceDir string, noCompression int, excludeF
 			if err != nil {
 				return fmt.Errorf("打开文件失败: %w", err)
 			}
-			defer file.Close()
+			defer func() { _ = file.Close() }()
 
 			// 获取文件大小
 			fileInfo, err := file.Stat()
@@ -979,7 +979,7 @@ func Unzip(zipFilePath string, targetDir string) error {
 	if err != nil {
 		return fmt.Errorf("打开 ZIP 文件失败: %w", err)
 	}
-	defer zipReader.Close()
+	defer func() { _ = zipReader.Close() }()
 
 	// 检查目标目录是否存在, 如果不存在, 则创建
 	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
@@ -1023,7 +1023,7 @@ func Unzip(zipFilePath string, targetDir string) error {
 			if err != nil {
 				return fmt.Errorf("打开 ZIP 文件中的软链接失败: %w", err)
 			}
-			defer zipFileReader.Close()
+			defer func() { _ = zipFileReader.Close() }()
 
 			var target string
 			// 读取软链接的目标路径
@@ -1059,14 +1059,14 @@ func Unzip(zipFilePath string, targetDir string) error {
 			if err != nil {
 				return fmt.Errorf("创建文件失败: %w", err)
 			}
-			defer fileWriter.Close()
+			defer func() { _ = fileWriter.Close() }()
 
 			// 打开 ZIP 文件中的文件
 			zipFileReader, err := file.Open()
 			if err != nil {
 				return fmt.Errorf("打开 ZIP 文件中的文件失败: %w", err)
 			}
-			defer zipFileReader.Close()
+			defer func() { _ = zipFileReader.Close() }()
 
 			// 获取文件的大小
 			fileSize := file.UncompressedSize64
