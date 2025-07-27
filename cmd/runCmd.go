@@ -216,7 +216,7 @@ func runTask(db *sqlx.DB, ids []int) error {
 		}
 
 		// 打印成功信息
-		CL.PrintOkf(`备份 %s 成功!\n`, task.TaskName)
+		CL.PrintOkf("备份 %s 成功!\n", task.TaskName)
 	}
 
 	return nil
